@@ -17,9 +17,16 @@ class KeyFastImeService:InputMethodService() {
  private val cyan=Color.rgb(32,199,217)
  override fun onCreate() { super.onCreate(); store=ShortcutStore(this) }
  override fun onCreateInputView():View {
-  root=LinearLayout(this).apply { orientation=LinearLayout.VERTICAL; setPadding(3,5,3,5); setBackgroundColor(panel) }
+  val keyboardHeight = (resources.displayMetrics.heightPixels * 0.34f).toInt()
+  root=LinearLayout(this).apply {
+   orientation=LinearLayout.VERTICAL
+   setPadding(3,5,3,5)
+   setBackgroundColor(panel)
+   minimumHeight=keyboardHeight
+   layoutParams=ViewGroup.LayoutParams(-1,keyboardHeight)
+  }
   suggestions=LinearLayout(this).apply { orientation=LinearLayout.HORIZONTAL; gravity=Gravity.CENTER_VERTICAL }
-  root.addView(suggestions,LinearLayout.LayoutParams(-1,44))
+  root.addView(suggestions,LinearLayout.LayoutParams(-1,48))
   buildKeys()
   refreshFromCursor()
   return root
@@ -41,7 +48,7 @@ class KeyFastImeService:InputMethodService() {
   addKey(bottom,"ESPAÇO",4f) { type(" ") }
   addKey(bottom,".",0.6f) { type(".") }
   addKey(bottom,"↵",1f) { enter() }
-  root.addView(bottom,LinearLayout.LayoutParams(-1,49))
+  root.addView(bottom,LinearLayout.LayoutParams(-1,0,1f))
  }
  private fun addRow(labels:List<String>) {
   val row=LinearLayout(this).apply { orientation=LinearLayout.HORIZONTAL }
@@ -53,10 +60,10 @@ class KeyFastImeService:InputMethodService() {
     else -> type(if(!symbols && caps) label.uppercase() else label)
    }
   } }
-  root.addView(row,LinearLayout.LayoutParams(-1,49))
+  root.addView(row,LinearLayout.LayoutParams(-1,0,1f))
  }
  private fun addKey(row:LinearLayout,label:String,weight:Float,action:()->Unit) {
-  val b=Button(this).apply { text=label; textSize=if(label=="ESPAÇO") 12f else 16f; isAllCaps=false; setTextColor(Color.WHITE); setBackgroundColor(if(label=="↵") cyan else keyColor); setPadding(1,1,1,1); setOnClickListener { action() } }
+  val b=Button(this).apply { text=label; textSize=if(label=="ESPAÇO") 14f else 18f; isAllCaps=false; setTextColor(Color.WHITE); setBackgroundColor(if(label=="↵") cyan else keyColor); setPadding(1,1,1,1); setOnClickListener { action() } }
   row.addView(b,LinearLayout.LayoutParams(0,-1,weight).apply { setMargins(2,2,2,2) })
  }
  private fun type(value:String) { currentInputConnection?.commitText(value,1); refreshFromCursor() }
@@ -76,12 +83,12 @@ class KeyFastImeService:InputMethodService() {
   val token=text.takeLastWhile { !it.isWhitespace() }.uppercase()
   val match=if(token.isNotBlank()) store.all().firstOrNull { it.trigger.equals(token,true) } else null
   if(match!=null) suggestions.addView(Button(this).apply {
-   this.text=match.trigger+"  →  "+match.recipientName; textSize=13f; isAllCaps=false
+   this.text=match.trigger+"  →  "+match.recipientName; textSize=15f; isAllCaps=false
    setTextColor(Color.WHITE); setBackgroundColor(cyan); setOnClickListener { expand(match) }
   },LinearLayout.LayoutParams(-1,-1))
   else suggestions.addView(TextView(this).apply {
    this.text="KeyFast  •  "+if(token.isBlank()) "Digite seu atalho" else "Nenhum atalho correspondente"
-   setTextColor(Color.LTGRAY); textSize=12f; gravity=Gravity.CENTER_VERTICAL
+   setTextColor(Color.LTGRAY); textSize=14f; gravity=Gravity.CENTER_VERTICAL
   })
  }
  private fun expand(item:RecipientShortcut) {
