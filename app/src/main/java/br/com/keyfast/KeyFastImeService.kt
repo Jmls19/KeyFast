@@ -76,11 +76,11 @@ class KeyFastImeService:InputMethodService() {
   val token=text.takeLastWhile { !it.isWhitespace() }.uppercase()
   val match=if(token.isNotBlank()) store.all().firstOrNull { it.trigger.equals(token,true) } else null
   if(match!=null) suggestions.addView(Button(this).apply {
-   text=match.trigger+"  →  "+match.recipientName; textSize=13f; isAllCaps=false
+   this.text=match.trigger+"  →  "+match.recipientName; textSize=13f; isAllCaps=false
    setTextColor(Color.WHITE); setBackgroundColor(cyan); setOnClickListener { expand(match) }
   },LinearLayout.LayoutParams(-1,-1))
   else suggestions.addView(TextView(this).apply {
-   text="KeyFast  •  "+if(token.isBlank()) "Digite seu atalho" else "Nenhum atalho correspondente"
+   this.text="KeyFast  •  "+if(token.isBlank()) "Digite seu atalho" else "Nenhum atalho correspondente"
    setTextColor(Color.LTGRAY); textSize=12f; gravity=Gravity.CENTER_VERTICAL
   })
  }
