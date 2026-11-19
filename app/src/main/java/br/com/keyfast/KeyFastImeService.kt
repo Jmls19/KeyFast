@@ -15,11 +15,9 @@ class KeyFastImeService:InputMethodService() {
  private var caps=false
  private var symbols=false
  private val panel=Color.rgb(24,28,35)
- private val keyColor=Color.rgb( sixty(),66,76)
+ private val keyColor=Color.rgb(60,66,76)
  private val specialColor=Color.rgb(55,63,75)
  private val cyan=Color.rgb(32,199,217)
-
- private fun sixty()=60
 
  override fun onCreate() { super.onCreate(); store=ShortcutStore(this) }
 
