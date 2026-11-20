@@ -146,12 +146,23 @@ class KeyFastImeService:InputMethodService() {
   actions.addView(actionText("SALVAR",cyan){saveForm()},LinearLayout.LayoutParams(dp(92),dp(38)).apply{setMargins(0,dp(10),0,0)})
   outer.addView(actions)
   formPopup?.dismiss()
+  outer.measure(
+   View.MeasureSpec.makeMeasureSpec(dp(320),View.MeasureSpec.EXACTLY),
+   View.MeasureSpec.makeMeasureSpec(resources.displayMetrics.heightPixels,View.MeasureSpec.AT_MOST)
+  )
+  val popupHeight=outer.measuredHeight
+  val rootPosition=IntArray(2)
+  root.getLocationOnScreen(rootPosition)
+  val keyboardTop=rootPosition[1]
+  val topMargin=dp(24)
+  val targetTop=((keyboardTop-popupHeight)/2).coerceAtLeast(topMargin)
+  val yOffset=targetTop-keyboardTop
   formPopup=PopupWindow(outer,dp(320),ViewGroup.LayoutParams.WRAP_CONTENT,true).apply{
    isOutsideTouchable=false;isFocusable=true;setBackgroundDrawable(keyBg(Color.TRANSPARENT))
-   elevation=dp(18).toFloat()
+   elevation=dp(18).toFloat();setClippingEnabled(false)
    setOnDismissListener{if(formMode){formMode=false;editingId=null;valueViews.clear();refreshFromCursor()}}
   }
-  formPopup?.showAtLocation(root,Gravity.CENTER,0,-dp(36))
+  formPopup?.showAtLocation(root,Gravity.TOP or Gravity.CENTER_HORIZONTAL,0,yOffset)
  }
 
  private fun actionText(label:String,color:Int,action:()->Unit)=TextView(this).apply{
