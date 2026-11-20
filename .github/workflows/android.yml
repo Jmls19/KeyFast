@@ -19,6 +19,14 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
+      - name: Bundle Inter font family
+        run: |
+          mkdir -p app/src/main/assets/fonts
+          curl -fL https://github.com/rsms/inter/releases/download/v4.1/Inter-4.1.zip -o /tmp/inter.zip
+          unzip -p /tmp/inter.zip extras/ttf/Inter-Regular.ttf > app/src/main/assets/fonts/Inter-Regular.ttf
+          unzip -p /tmp/inter.zip extras/ttf/Inter-Medium.ttf > app/src/main/assets/fonts/Inter-Medium.ttf
+          unzip -p /tmp/inter.zip extras/ttf/Inter-Bold.ttf > app/src/main/assets/fonts/Inter-Bold.ttf
+          unzip -p /tmp/inter.zip LICENSE.txt > app/src/main/assets/fonts/OFL.txt
       - name: Build debug APK
         run: gradle assembleDebug
       - name: Upload APK
