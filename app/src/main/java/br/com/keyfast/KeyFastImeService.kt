@@ -100,17 +100,22 @@ class KeyFastImeService:InputMethodService() {
   if(left>0f) row.addView(Space(this),LinearLayout.LayoutParams(0,1,left))
   labels.forEach { label ->
    val isAccentLetter = !numberRow && label.lowercase() in setOf("a","e","i","o","u","c")
-   addKey(row,label,1f,if(numberRow) specialColor else keyColor,{
-    if(label=="ABC") { symbols=false; buildKeys() }
-    else if(label=="⌫") {
-     currentInputConnection?.let {
-      if(!it.deleteSurroundingText(1,0)) it.sendKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN,KeyEvent.KEYCODE_DEL))
-      refreshFromCursor()
-     }
-    } else if(label.length==1) type(label)
-   }) {
-    if(isAccentLetter) showAccentOptions(label)
-   }
+   addKey(
+    row,
+    label,
+    1f,
+    if(numberRow) specialColor else keyColor,
+    longPress = { if(isAccentLetter) showAccentOptions(label) },
+    action = {
+     if(label=="ABC") { symbols=false; buildKeys() }
+     else if(label=="⌫") {
+      currentInputConnection?.let {
+       if(!it.deleteSurroundingText(1,0)) it.sendKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN,KeyEvent.KEYCODE_DEL))
+       refreshFromCursor()
+      }
+     } else if(label.length==1) type(label)
+    }
+   )
   }
   if(right>0f) row.addView(Space(this),LinearLayout.LayoutParams(0,1,right))
   root.addView(row,LinearLayout.LayoutParams(-1,0,1f))
