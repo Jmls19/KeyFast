@@ -4,7 +4,6 @@ import android.view.*
 import android.view.inputmethod.EditorInfo
 import android.graphics.Color
 import android.graphics.drawable.GradientDrawable
-import android.os.Build
 import android.view.Gravity
 import android.widget.*
 
@@ -22,15 +21,6 @@ class KeyFastImeService:InputMethodService() {
  override fun onCreate() { super.onCreate(); store=ShortcutStore(this) }
 
  override fun onCreateInputView():View {
-  // Keep the system navigation area visually separate from the key rows.
-  window?.navigationBarColor=panel
-  window?.statusBarColor=panel
-  if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-   window?.isNavigationBarContrastEnforced=false
-   window?.isStatusBarContrastEnforced=false
-  }
-  window?.decorView?.systemUiVisibility=0
-
   val keyboardHeight=(resources.displayMetrics.heightPixels*0.34f).toInt()
   root=LinearLayout(this).apply {
    orientation=LinearLayout.VERTICAL
