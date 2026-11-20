@@ -354,7 +354,43 @@ class KeyFastImeService:InputMethodService() {
    text=label;textSize=if(label=="—")22f else 19f;gravity=Gravity.CENTER;setTextColor(Color.WHITE);typeface=interMedium
    val mask=keyBg(Color.WHITE)
    background=if(Build.VERSION.SDK_INT>=Build.VERSION_CODES.LOLLIPOP)RippleDrawable(ColorStateList.valueOf(Color.argb(95,255,255,255)),keyBg(color),mask)else keyBg(color)
-   isClickable=true;isFocusable=true;setOnClickListener{action()};if(longPress!=null)setOnLongClickListener{longPress();true}
+   isClickable=true;isFocusable=true
+   if(label=="⌫"){
+    // Toque curto apaga um caractere; segurar apaga a palavra e,
+    // mantendo pressionado, limpa o conteúdo do campo atual.
+    val holdHandler=Handler(Looper.getMainLooper())
+    var holdTriggered=false
+    lateinit var clearField:Runnable
+    val deleteWord=Runnable{
+     holdTriggered=true
+     deletePreviousWord()
+     holdHandler.postDelayed(clearField,900L)
+    }
+    clearField=Runnable{
+     holdTriggered=true
+     deleteEntireField()
+    }
+    setOnTouchListener{_,event->
+     when(event.action){
+      MotionEvent.ACTION_DOWN->{
+       holdTriggered=false
+       holdHandler.removeCallbacks(deleteWord);holdHandler.removeCallbacks(clearField)
+       holdHandler.postDelayed(deleteWord,500L)
+       true
+      }
+      MotionEvent.ACTION_UP->{
+       holdHandler.removeCallbacks(deleteWord);holdHandler.removeCallbacks(clearField)
+       if(!holdTriggered)backspace()
+       performClick()
+       true
+      }
+      MotionEvent.ACTION_CANCEL->{
+       holdHandler.removeCallbacks(deleteWord);holdHandler.removeCallbacks(clearField);true
+      }
+      else->true
+     }
+    }
+   }else setOnClickListener{action()}
    if(label=="—")contentDescription="Espaço"
   }
   row.addView(key,LinearLayout.LayoutParams(0,-1,weight).apply{setMargins(dp(3),dp(3),dp(3),dp(3))})
@@ -394,6 +430,35 @@ class KeyFastImeService:InputMethodService() {
  private fun backspace(){
   if(formMode){if(values[formField].isNotEmpty())values[formField]=values[formField].dropLast(1);updateForm();return}
   currentInputConnection?.let{if(!it.deleteSurroundingText(1,0))it.sendKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN,KeyEvent.KEYCODE_DEL));refreshFromCursor()}
+ }
+ private fun deletePreviousWord(){
+  if(formMode){
+   val current=values[formField]
+   val trimmed=current.trimEnd()
+   values[formField]=trimmed.dropLastWhile{!it.isWhitespace()}
+   updateForm()
+   return
+  }
+  val ic=currentInputConnection?:return
+  val before=ic.getTextBeforeCursor(1000,0)?.toString().orEmpty()
+  val trimmed=before.trimEnd()
+  val wordLength=trimmed.takeLastWhile{!it.isWhitespace()}.length
+  val trailingSpaces=before.length-trimmed.length
+  val count=wordLength+trailingSpaces
+  if(count>0)ic.deleteSurroundingText(count,0)
+  refreshFromCursor()
+ }
+ private fun deleteEntireField(){
+  if(formMode){
+   values[formField]=""
+   updateForm()
+   return
+  }
+  val ic=currentInputConnection?:return
+  val beforeLength=ic.getTextBeforeCursor(10000,0)?.length?:0
+  val afterLength=ic.getTextAfterCursor(10000,0)?.length?:0
+  if(beforeLength+afterLength>0)ic.deleteSurroundingText(beforeLength,afterLength)
+  refreshFromCursor()
  }
  private fun enter(){
   if(formMode){if(formField<2){formField++;updateForm()}else saveForm();return}
