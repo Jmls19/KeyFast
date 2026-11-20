@@ -72,7 +72,7 @@ class KeyFastImeService:InputMethodService() {
    addKey(lowerRow,"⇧",1.25f,specialColor) { caps=!caps; buildKeys() }
    lower.forEach { letter ->
     val shown=if(caps) letter.uppercase() else letter
-    addKey(lowerRow,shown,1f,keyColor,{ type(shown) }) { showAccentOptions(letter) }
+    addKey(lowerRow,shown,1f,keyColor,longPress = { showAccentOptions(letter) }, action = { type(shown) })
    }
    addKey(lowerRow,"⌫",1.25f,specialColor) {
     currentInputConnection?.let {
@@ -162,7 +162,7 @@ class KeyFastImeService:InputMethodService() {
   setColor(color); cornerRadius=dp(8).toFloat()
  }
 
- private fun addKey(row:LinearLayout,label:String,weight:Float,color:Int,action:()->Unit,longPress:(()->Unit)?=null) {
+ private fun addKey(row:LinearLayout,label:String,weight:Float,color:Int,longPress:(()->Unit)?=null,action:()->Unit) {
   val key=TextView(this).apply {
    text=label
    textSize=if(label=="ESPAÇO") 12f else 19f
