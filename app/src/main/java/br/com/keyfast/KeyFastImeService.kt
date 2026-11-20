@@ -72,7 +72,7 @@ class KeyFastImeService:InputMethodService() {
    addKey(lowerRow,"⇧",1.25f,specialColor) { caps=!caps; buildKeys() }
    lower.forEach { letter ->
     val shown=if(caps) letter.uppercase() else letter
-    addKey(lowerRow,shown,1f,keyColor) { typeLetter(letter) }
+    addKey(lowerRow,shown,1f,keyColor,{ type(shown) }) { showAccentOptions(letter) }
    }
    addKey(lowerRow,"⌫",1.25f,specialColor) {
     currentInputConnection?.let {
@@ -99,34 +99,35 @@ class KeyFastImeService:InputMethodService() {
   val row=LinearLayout(this).apply { orientation=LinearLayout.HORIZONTAL }
   if(left>0f) row.addView(Space(this),LinearLayout.LayoutParams(0,1,left))
   labels.forEach { label ->
-   addKey(row,label,1f,if(numberRow) specialColor else keyColor) {
+   val isAccentLetter = !numberRow && label.lowercase() in setOf("a","e","i","o","u","c")
+   addKey(row,label,1f,if(numberRow) specialColor else keyColor,{
     if(label=="ABC") { symbols=false; buildKeys() }
     else if(label=="⌫") {
      currentInputConnection?.let {
       if(!it.deleteSurroundingText(1,0)) it.sendKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN,KeyEvent.KEYCODE_DEL))
       refreshFromCursor()
      }
-    } else if(label.length==1 && label[0].isDigit()) type(label)
-    else if(label.length==1) type(label)
+    } else if(label.length==1) type(label)
+   }) {
+    if(isAccentLetter) showAccentOptions(label)
    }
   }
   if(right>0f) row.addView(Space(this),LinearLayout.LayoutParams(0,1,right))
   root.addView(row,LinearLayout.LayoutParams(-1,0,1f))
  }
 
- private fun typeLetter(letter:String) {
+ private fun showAccentOptions(letter:String) {
   val lower=letter.lowercase()
   val choices=when(lower) {
-   "a" -> listOf("a","á","à","â","ã")
-   "e" -> listOf("e","é","ê")
-   "i" -> listOf("i","í")
-   "o" -> listOf("o","ó","ô","õ")
-   "u" -> listOf("u","ú")
-   "c" -> listOf("c","ç")
+   "a" -> listOf("á","à","â","ã")
+   "e" -> listOf("é","ê")
+   "i" -> listOf("í")
+   "o" -> listOf("ó","ô","õ")
+   "u" -> listOf("ú")
+   "c" -> listOf("ç")
    else -> emptyList()
   }
-  if(choices.isEmpty()) type(if(caps) lower.uppercase() else lower)
-  else showAccentPopup(choices,if(caps) lower.uppercase() else lower)
+  if(choices.isNotEmpty()) showAccentPopup(choices,letter)
  }
 
  private fun showAccentPopup(options:List<String>,base:String) {
@@ -135,6 +136,7 @@ class KeyFastImeService:InputMethodService() {
    setPadding(dp(5),dp(5),dp(5),dp(5))
    setBackgroundColor(Color.rgb(37,43,53))
   }
+  lateinit var popup:PopupWindow
   options.forEach { option ->
    val shown=if(caps) option.uppercase() else option
    val item=TextView(this).apply {
@@ -144,11 +146,11 @@ class KeyFastImeService:InputMethodService() {
     setTextColor(Color.WHITE)
     background=keyBackground(cyan)
     isClickable=true
-    setOnClickListener { type(shown); (content.parent as? PopupWindow)?.dismiss() }
+    setOnClickListener { type(shown); popup.dismiss() }
    }
    content.addView(item,LinearLayout.LayoutParams(dp(48),dp(52)).apply { setMargins(dp(2),0,dp(2),0) })
   }
-  val popup=PopupWindow(content,ViewGroup.LayoutParams.WRAP_CONTENT,ViewGroup.LayoutParams.WRAP_CONTENT,true)
+  popup=PopupWindow(content,ViewGroup.LayoutParams.WRAP_CONTENT,ViewGroup.LayoutParams.WRAP_CONTENT,true)
   popup.isOutsideTouchable=true
   popup.setBackgroundDrawable(GradientDrawable().apply { setColor(Color.TRANSPARENT) })
   popup.elevation=dp(8).toFloat()
@@ -160,7 +162,7 @@ class KeyFastImeService:InputMethodService() {
   setColor(color); cornerRadius=dp(8).toFloat()
  }
 
- private fun addKey(row:LinearLayout,label:String,weight:Float,color:Int,action:()->Unit) {
+ private fun addKey(row:LinearLayout,label:String,weight:Float,color:Int,action:()->Unit,longPress:(()->Unit)?=null) {
   val key=TextView(this).apply {
    text=label
    textSize=if(label=="ESPAÇO") 12f else 19f
@@ -173,6 +175,7 @@ class KeyFastImeService:InputMethodService() {
    isClickable=true
    isFocusable=true
    setOnClickListener { action() }
+   if(longPress!=null) setOnLongClickListener { longPress(); true }
    if(label=="ESPAÇO") contentDescription="Espaço"
   }
   row.addView(key,LinearLayout.LayoutParams(0,-1,weight).apply {
