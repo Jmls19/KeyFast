@@ -46,6 +46,8 @@ class KeyFastImeService:InputMethodService() {
  private val specialColor=Color.rgb(31,45,65)
  private val cyan=Color.rgb(32,199,217)
  private val ink=Color.rgb(12,19,32)
+ private val interRegular by lazy { Typeface.createFromAsset(assets,"fonts/Inter-Regular.ttf") }
+ private val interMedium by lazy { Typeface.createFromAsset(assets,"fonts/Inter-Medium.ttf") }
 
  override fun onCreate(){ super.onCreate(); store=ShortcutStore(this) }
  private fun dp(v:Int)=(v*resources.displayMetrics.density+0.5f).toInt()
@@ -143,7 +145,7 @@ class KeyFastImeService:InputMethodService() {
    card.addView(TextView(this).apply{text=labels[i];textSize=9f;setTextColor(cyan)})
    val value=TextView(this).apply{
     text=values[i].ifBlank{"Toque aqui e digite no teclado"}
-    textSize=14f;setTextColor(Color.WHITE);typeface=Typeface.create("sans-serif",Typeface.NORMAL);gravity=Gravity.CENTER_VERTICAL;maxLines=1
+    textSize=14f;setTextColor(Color.WHITE);typeface=interRegular;gravity=Gravity.CENTER_VERTICAL;maxLines=1
     ellipsize=android.text.TextUtils.TruncateAt.END
    }
    valueViews.add(value);card.addView(value,LinearLayout.LayoutParams(-1,dp(29)))
@@ -304,7 +306,7 @@ class KeyFastImeService:InputMethodService() {
  private fun keyBg(color:Int)=GradientDrawable().apply{setColor(color);cornerRadius=dp(8).toFloat()}
  private fun addKey(row:LinearLayout,label:String,weight:Float,color:Int,longPress:(()->Unit)?=null,action:()->Unit){
   val key=TextView(this).apply{
-   text=label;textSize=if(label=="ESPAÇO")12f else 19f;gravity=Gravity.CENTER;setTextColor(Color.WHITE);typeface=Typeface.create("sans-serif",Typeface.MEDIUM)
+   text=label;textSize=if(label=="ESPAÇO")12f else 19f;gravity=Gravity.CENTER;setTextColor(Color.WHITE);typeface=interMedium
    val mask=keyBg(Color.WHITE)
    background=if(Build.VERSION.SDK_INT>=Build.VERSION_CODES.LOLLIPOP)RippleDrawable(ColorStateList.valueOf(Color.argb(95,255,255,255)),keyBg(color),mask)else keyBg(color)
    isClickable=true;isFocusable=true;setOnClickListener{action()};if(longPress!=null)setOnLongClickListener{longPress();true}
