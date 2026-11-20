@@ -280,14 +280,12 @@ class KeyFastImeService:InputMethodService() {
    val manager=getSystemService(TextServicesManager::class.java)
    spellSession=manager?.newSpellCheckerSession(null,Locale("pt","BR"),object:SpellCheckerSession.SpellCheckerSessionListener{
     override fun onGetSuggestions(results:Array<SuggestionsInfo>){
-     if(results.isEmpty())return
-     val candidates=(0 until results[0].suggestionsCount).mapNotNull{results[0].getSuggestionAt(it)}
-      .filter{it.isNotBlank()&&!it.equals(requestedToken,true)}.distinct().take(4)
      val responseToken=spellRequestToken
-     if(responseToken.isNotBlank() && responseToken==requestedToken){
-      shownSuggestions=candidates
-      runOnUiThread{if(!formMode)renderWordSuggestions(responseToken,candidates)}
-     }
+     if(results.isEmpty() || responseToken.isBlank() || responseToken!=requestedToken)return
+     val candidates=(0 until results[0].suggestionsCount).mapNotNull{results[0].getSuggestionAt(it)}
+      .filter{it.isNotBlank()&&!it.equals(responseToken,true)}.distinct().take(4)
+     shownSuggestions=candidates
+     runOnUiThread{if(!formMode)renderWordSuggestions(responseToken,candidates)}
     }
     override fun onGetSentenceSuggestions(results:Array<android.view.textservice.SentenceSuggestionsInfo>){}
    },true)
@@ -305,7 +303,7 @@ class KeyFastImeService:InputMethodService() {
   if(token.isBlank()){requestedToken="";shownSuggestions=emptyList();return}
   val match=store.all().firstOrNull{it.trigger.equals(token,true)}
   if(match!=null){
-   requestedToken=token
+   requestedToken=token;shownSuggestions=emptyList()
    suggestions.addView(TextView(this).apply{
     text=match.trigger+"   ›   "+match.recipientName;textSize=14f;gravity=Gravity.CENTER_VERTICAL;setTextColor(Color.WHITE)
     setPadding(dp(13),0,dp(13),0);background=keyBg(Color.rgb(45,75,88));isClickable=true;setOnClickListener{expand(match)}
