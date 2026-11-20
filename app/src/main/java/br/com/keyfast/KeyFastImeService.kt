@@ -67,7 +67,7 @@ class KeyFastImeService:InputMethodService() {
   suggestions=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER_VERTICAL}
   bar.addView(suggestions,LinearLayout.LayoutParams(0,-1,1f))
   val manage=TextView(this).apply{
-   text="⚙";textSize=24f;gravity=Gravity.CENTER;setTextColor(cyan);typeface=interMedium
+   text="⚙️";textSize=24f;gravity=Gravity.CENTER;setTextColor(cyan);typeface=interMedium
    background=keyBg(Color.rgb(35,91,105));isClickable=true;setPadding(dp(5),0,dp(5),0)
    contentDescription="Gerenciar atalhos";setOnClickListener{showManageMenu(this)}
   }
@@ -101,7 +101,7 @@ class KeyFastImeService:InputMethodService() {
   val bottom=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL}
   addKey(bottom,if(symbols)"ABC" else "?123",1.25f,specialColor){symbols=!symbols;buildKeys()}
   addKey(bottom,",",0.75f,specialColor){type(",")}
-  addKey(bottom,"ESPAÇO",4.5f,keyColor){type(" ")}
+  addKey(bottom,"—",4.5f,keyColor){type(" ")}
   addKey(bottom,".",0.75f,specialColor){type(".")}
   addKey(bottom,"↵",1.25f,cyan){enter()}
   root.addView(bottom,LinearLayout.LayoutParams(-1,0,1f))
@@ -144,9 +144,13 @@ class KeyFastImeService:InputMethodService() {
    }
    card.addView(TextView(this).apply{text=labels[i];textSize=9f;typeface=interMedium;setTextColor(cyan)})
    val value=TextView(this).apply{
-    text=values[i].ifBlank{"Toque aqui e digite no teclado"}
+    text=if(i==formField) values[i]+"│" else values[i].ifBlank{"Toque aqui e digite no teclado"}
     textSize=14f;setTextColor(Color.WHITE);typeface=interRegular;gravity=Gravity.CENTER_VERTICAL;maxLines=1
     ellipsize=android.text.TextUtils.TruncateAt.END
+    if(i==formField){
+     val blink=ObjectAnimator.ofFloat(this,"alpha",1f,0.25f).apply{duration=560;repeatCount=ObjectAnimator.INFINITE;repeatMode=ObjectAnimator.REVERSE}
+     blink.start()
+    }
    }
    valueViews.add(value);card.addView(value,LinearLayout.LayoutParams(-1,dp(29)))
    outer.addView(card,LinearLayout.LayoutParams(-1,dp(57)).apply{setMargins(0,dp(3),0,dp(3))})
@@ -185,7 +189,9 @@ class KeyFastImeService:InputMethodService() {
  }
  private fun updateForm(){
   valueViews.forEachIndexed{i,v->
-   v.text=values[i].ifBlank{"Toque aqui e digite no teclado"}
+   v.text=if(i==formField) values[i]+"│" else values[i].ifBlank{"Toque aqui e digite no teclado"}
+   v.alpha=1f
+   if(i==formField){ObjectAnimator.ofFloat(v,"alpha",1f,0.25f).apply{duration=560;repeatCount=ObjectAnimator.INFINITE;repeatMode=ObjectAnimator.REVERSE;start()}}
    (v.parent as? View)?.background=keyBg(if(i==formField)Color.rgb(35,91,105)else Color.rgb(38,52,73))
   }
  }
@@ -203,11 +209,11 @@ class KeyFastImeService:InputMethodService() {
  }
 
  private fun showManageMenu(anchor:View){
-  val width=dp(196);val height=dp(176)
+  val width=dp(190);val height=dp(166)
   val fan=FrameLayout(this).apply{clipChildren=false;clipToPadding=false}
   val labels=listOf("NOVO","EDITAR","EXCLUIR")
   val colors=listOf(cyan,Color.rgb(29,137,166),Color.rgb(38,52,73))
-  val positions=listOf(Triple(130,12,0),Triple(76,62,1),Triple(20,116,2))
+  val positions=listOf(Triple(8,4,0),Triple(62,54,1),Triple(116,104,2))
   lateinit var popup:PopupWindow
   positions.forEachIndexed{index,pos->
    val button=TextView(this).apply{
@@ -238,13 +244,13 @@ class KeyFastImeService:InputMethodService() {
   // para fora da área visível do teclado.
   val loc=IntArray(2);anchor.getLocationInWindow(loc)
   val x=(loc[0]+anchor.width-width).coerceAtLeast(dp(4))
-  val y=(loc[1]+anchor.height-dp(5)).coerceAtLeast(dp(4))
+  val y=(loc[1]-height+dp(8)).coerceAtLeast(dp(4))
   popup.showAtLocation(root,Gravity.TOP or Gravity.LEFT,x,y)
   for(i in 0 until fan.childCount){
    val child=fan.getChildAt(i)
    val lp=child.layoutParams as FrameLayout.LayoutParams
    val dx=dp(176)-lp.leftMargin-dp(33)
-   val dy=dp(8)-lp.topMargin
+   val dy=dp(154)-lp.topMargin
    child.translationX=dx.toFloat();child.translationY=dy.toFloat()
    child.animate().alpha(1f).scaleX(1f).scaleY(1f).translationX(0f).translationY(0f)
     .setStartDelay((i*45).toLong()).setDuration(230).setInterpolator(DecelerateInterpolator()).start()
@@ -309,16 +315,16 @@ class KeyFastImeService:InputMethodService() {
   // Mantém o foco no editor/IME ao escolher um caractere acentuado.
   popup.showAtLocation(root,Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL,0,dp(190))
  }
- private fun keyBg(color:Int)=GradientDrawable().apply{setColor(color);cornerRadius=dp(8).toFloat()}
+ private fun keyBg(color:Int)=GradientDrawable().apply{setColor(color);cornerRadius=dp(11).toFloat()}
  private fun addKey(row:LinearLayout,label:String,weight:Float,color:Int,longPress:(()->Unit)?=null,action:()->Unit){
   val key=TextView(this).apply{
-   text=label;textSize=if(label=="ESPAÇO")12f else 19f;gravity=Gravity.CENTER;setTextColor(Color.WHITE);typeface=interMedium
+   text=label;textSize=if(label=="—")22f else 19f;gravity=Gravity.CENTER;setTextColor(Color.WHITE);typeface=interMedium
    val mask=keyBg(Color.WHITE)
    background=if(Build.VERSION.SDK_INT>=Build.VERSION_CODES.LOLLIPOP)RippleDrawable(ColorStateList.valueOf(Color.argb(95,255,255,255)),keyBg(color),mask)else keyBg(color)
    isClickable=true;isFocusable=true;setOnClickListener{action()};if(longPress!=null)setOnLongClickListener{longPress();true}
-   if(label=="ESPAÇO")contentDescription="Espaço"
+   if(label=="—")contentDescription="Espaço"
   }
-  row.addView(key,LinearLayout.LayoutParams(0,-1,weight).apply{setMargins(dp(2),dp(2),dp(2),dp(2))})
+  row.addView(key,LinearLayout.LayoutParams(0,-1,weight).apply{setMargins(dp(3),dp(3),dp(3),dp(3))})
  }
 
  private fun type(s:String){
