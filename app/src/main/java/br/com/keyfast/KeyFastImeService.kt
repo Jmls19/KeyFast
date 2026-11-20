@@ -1,7 +1,12 @@
 package br.com.keyfast
+
 import android.inputmethodservice.InputMethodService
 import android.view.*
 import android.view.inputmethod.EditorInfo
+import android.view.textservice.TextInfo
+import android.view.textservice.SuggestionsInfo
+import android.view.textservice.SpellCheckerSession
+import android.view.textservice.TextServicesManager
 import android.graphics.Color
 import android.graphics.drawable.GradientDrawable
 import android.graphics.drawable.RippleDrawable
@@ -9,18 +14,25 @@ import android.content.res.ColorStateList
 import android.os.Build
 import android.view.Gravity
 import android.widget.*
+import java.util.Locale
 
 class KeyFastImeService:InputMethodService() {
  private lateinit var root:LinearLayout
  private lateinit var suggestions:LinearLayout
  private lateinit var store:ShortcutStore
  private var caps=false
+ private var capsLock=false
+ private var lastShiftTap=0L
  private var symbols=false
  private var formMode=false
  private var editingId:String?=null
  private var formField=0
  private val values= mutableListOf("","","")
  private val valueViews= mutableListOf<TextView>()
+ private var formPopup:PopupWindow?=null
+ private var spellSession:SpellCheckerSession?=null
+ private var requestedToken=""
+ private var shownSuggestions=emptyList<String>()
  private val panel=Color.rgb(24,28,35)
  private val keyColor=Color.rgb(60,66,76)
  private val specialColor=Color.rgb(55,63,75)
@@ -44,24 +56,29 @@ class KeyFastImeService:InputMethodService() {
   suggestions=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER_VERTICAL}
   bar.addView(suggestions,LinearLayout.LayoutParams(0,-1,1f))
   val manage=TextView(this).apply{
-   text="ATALHOS";textSize=11f;gravity=Gravity.CENTER;setTextColor(Color.WHITE)
-   background=keyBg(Color.rgb(35,91,105));isClickable=true;setPadding(dp(9),0,dp(9),0)
+   text="⚙";textSize=24f;gravity=Gravity.CENTER;setTextColor(Color.WHITE)
+   background=keyBg(Color.rgb(35,91,105));isClickable=true;setPadding(dp(5),0,dp(5),0)
    contentDescription="Gerenciar atalhos";setOnClickListener{showManageMenu(this)}
   }
-  bar.addView(manage,LinearLayout.LayoutParams(dp(88),dp(31)))
+  bar.addView(manage,LinearLayout.LayoutParams(dp(44),dp(34)))
   root.addView(bar,LinearLayout.LayoutParams(-1,dp(38)))
   buildKeys();refreshFromCursor();return root
  }
 
+ override fun onDestroy(){
+  spellSession?.close(); spellSession=null
+  formPopup?.dismiss(); formPopup=null
+  super.onDestroy()
+ }
+
  private fun buildKeys(){
   while(root.childCount>1)root.removeViewAt(1)
-  if(formMode)root.addView(formPanel(),LinearLayout.LayoutParams(-1,dp(82)))
   if(!symbols){
    addRow(listOf("1","2","3","4","5","6","7","8","9","0"),number=true)
    val a=listOf("q","w","e","r","t","y","u","i","o","p");addRow(if(caps)a.map{it.uppercase()}else a)
    val b=listOf("a","s","d","f","g","h","j","k","l");addRow(if(caps)b.map{it.uppercase()}else b,0.5f,0.5f)
    val c=listOf("z","x","c","v","b","n","m");val row=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL}
-   addKey(row,"⇧",1.25f,specialColor){caps=!caps;buildKeys()}
+   addKey(row,"⇧",1.25f,if(capsLock)cyan else specialColor){handleShift()}
    c.forEach{ch->val shown=if(caps)ch.uppercase()else ch;addKey(row,shown,1f,keyColor,{showAccentOptions(ch)}){type(shown)}}
    addKey(row,"⌫",1.25f,specialColor){backspace()}
    root.addView(row,LinearLayout.LayoutParams(-1,0,1f))
@@ -79,40 +96,77 @@ class KeyFastImeService:InputMethodService() {
   root.addView(bottom,LinearLayout.LayoutParams(-1,0,1f))
  }
 
- private fun formPanel():View{
+ private fun handleShift(){
+  val now=System.currentTimeMillis()
+  if(capsLock){capsLock=false;caps=false;lastShiftTap=0L}
+  else if(caps && now-lastShiftTap<=450L){capsLock=true;caps=true;lastShiftTap=0L}
+  else if(caps){caps=false;lastShiftTap=0L}
+  else{caps=true;lastShiftTap=now}
+  buildKeys()
+ }
+
+ private fun updateShiftAfterCharacter(value:String){
+  if(caps && !capsLock && value.any{it.isLetter()}){
+   caps=false;lastShiftTap=0L;buildKeys()
+  }
+ }
+
+ private fun showForm(item:RecipientShortcut?){
+  editingId=item?.id
+  values[0]=item?.trigger?:"";values[1]=item?.recipientName?:"";values[2]=item?.document?:""
+  formField=0;formMode=true;symbols=false
+  buildKeys()
   valueViews.clear()
-  val outer=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setPadding(dp(2),dp(2),dp(2),dp(2))}
-  val fields=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL}
-  val labels=listOf("ATALHO","NOME","DOCUMENTO")
+  val outer=LinearLayout(this).apply{
+   orientation=LinearLayout.VERTICAL;setPadding(dp(16),dp(14),dp(16),dp(14));background=keyBg(Color.rgb(32,42,56))
+  }
+  outer.addView(TextView(this).apply{
+   text=if(item==null)"NOVO ATALHO" else "EDITAR ATALHO"
+   textSize=16f;setTextColor(cyan);gravity=Gravity.CENTER;setPadding(0,0,0,dp(10))
+  })
+  val labels=listOf("ATALHO","NOME / DESTINATÁRIO","DOCUMENTO")
   for(i in 0..2){
    val card=LinearLayout(this).apply{
-    orientation=LinearLayout.VERTICAL;gravity=Gravity.CENTER;setPadding(dp(3),dp(3),dp(3),dp(3))
+    orientation=LinearLayout.VERTICAL;setPadding(dp(10),dp(6),dp(10),dp(6))
     background=keyBg(if(i==formField)Color.rgb(35,91,105)else Color.rgb(38,52,73))
     isClickable=true;setOnClickListener{formField=i;updateForm()}
    }
-   card.addView(TextView(this).apply{text=labels[i];textSize=9f;setTextColor(cyan);gravity=Gravity.CENTER})
-   val value=TextView(this).apply{text=values[i].ifBlank{"Toque para digitar"};textSize=11f;setTextColor(Color.WHITE);gravity=Gravity.CENTER;maxLines=1;ellipsize=android.text.TextUtils.TruncateAt.END}
-   valueViews.add(value);card.addView(value,LinearLayout.LayoutParams(-1,dp(25)))
-   fields.addView(card,LinearLayout.LayoutParams(0,dp(53),1f).apply{setMargins(dp(2),0,dp(2),0)})
+   card.addView(TextView(this).apply{text=labels[i];textSize=9f;setTextColor(cyan)})
+   val value=TextView(this).apply{
+    text=values[i].ifBlank{"Toque aqui e digite no teclado"}
+    textSize=14f;setTextColor(Color.WHITE);gravity=Gravity.CENTER_VERTICAL;maxLines=1
+    ellipsize=android.text.TextUtils.TruncateAt.END
+   }
+   valueViews.add(value);card.addView(value,LinearLayout.LayoutParams(-1,dp(29)))
+   outer.addView(card,LinearLayout.LayoutParams(-1,dp(57)).apply{setMargins(0,dp(3),0,dp(3))})
   }
-  outer.addView(fields)
   val actions=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.END}
-  actions.addView(actionText("CANCELAR",specialColor){closeForm()},LinearLayout.LayoutParams(dp(92),dp(27)).apply{setMargins(0,dp(2),dp(5),0)})
-  actions.addView(actionText("SALVAR",cyan){saveForm()},LinearLayout.LayoutParams(dp(82),dp(27)).apply{setMargins(0,dp(2),dp(2),0)})
-  outer.addView(actions);return outer
+  actions.addView(actionText("CANCELAR",specialColor){closeForm()},LinearLayout.LayoutParams(dp(100),dp(38)).apply{setMargins(0,dp(10),dp(8),0)})
+  actions.addView(actionText("SALVAR",cyan){saveForm()},LinearLayout.LayoutParams(dp(92),dp(38)).apply{setMargins(0,dp(10),0,0)})
+  outer.addView(actions)
+  formPopup?.dismiss()
+  formPopup=PopupWindow(outer,dp(320),ViewGroup.LayoutParams.WRAP_CONTENT,true).apply{
+   isOutsideTouchable=false;isFocusable=true;setBackgroundDrawable(keyBg(Color.TRANSPARENT))
+   elevation=dp(18).toFloat()
+   setOnDismissListener{if(formMode){formMode=false;editingId=null;valueViews.clear();refreshFromCursor()}}
+  }
+  formPopup?.showAtLocation(root,Gravity.CENTER,0,-dp(36))
  }
+
  private fun actionText(label:String,color:Int,action:()->Unit)=TextView(this).apply{
-  text=label;textSize=10f;gravity=Gravity.CENTER;setTextColor(Color.WHITE);background=keyBg(color);isClickable=true;setOnClickListener{action()}
+  text=label;textSize=11f;gravity=Gravity.CENTER;setTextColor(Color.WHITE);background=keyBg(color);isClickable=true;setOnClickListener{action()}
  }
  private fun updateForm(){
-  valueViews.forEachIndexed{i,v->v.text=values[i].ifBlank{"Toque para digitar"};(v.parent as? View)?.background=keyBg(if(i==formField)Color.rgb(35,91,105)else Color.rgb(38,52,73))}
+  valueViews.forEachIndexed{i,v->
+   v.text=values[i].ifBlank{"Toque aqui e digite no teclado"}
+   (v.parent as? View)?.background=keyBg(if(i==formField)Color.rgb(35,91,105)else Color.rgb(38,52,73))
+  }
  }
- private fun showForm(item:RecipientShortcut?){
-  editingId=item?.id;values[0]=item?.trigger?:"";values[1]=item?.recipientName?:"";values[2]=item?.document?:""
-  formField=0;formMode=true;symbols=false;caps=false;buildKeys();suggestions.removeAllViews()
-  suggestions.addView(TextView(this).apply{text=if(item==null)"NOVO ATALHO" else "EDITAR ATALHO";textSize=13f;setTextColor(cyan);gravity=Gravity.CENTER_VERTICAL})
+ private fun closeForm(){
+  formMode=false;editingId=null;values.indices.forEach{values[it]=""}
+  valueViews.clear();formPopup?.setOnDismissListener(null);formPopup?.dismiss();formPopup=null
+  buildKeys();refreshFromCursor()
  }
- private fun closeForm(){formMode=false;editingId=null;values.indices.forEach{values[it]=""};buildKeys();refreshFromCursor()}
  private fun saveForm(){
   val t=values[0].trim().uppercase();val n=values[1].trim();val d=values[2].trim()
   if(t.isBlank()||n.isBlank()||d.isBlank()){Toast.makeText(this,"Preencha atalho, nome e documento.",Toast.LENGTH_SHORT).show();return}
@@ -199,9 +253,14 @@ class KeyFastImeService:InputMethodService() {
   }
   row.addView(key,LinearLayout.LayoutParams(0,-1,weight).apply{setMargins(dp(2),dp(2),dp(2),dp(2))})
  }
+
  private fun type(s:String){
-  if(formMode){values[formField]+=s;updateForm();return}
-  currentInputConnection?.commitText(s,1);refreshFromCursor()
+  if(formMode){
+   values[formField]+=s;updateForm();updateShiftAfterCharacter(s);return
+  }
+  currentInputConnection?.commitText(s,1)
+  updateShiftAfterCharacter(s)
+  refreshFromCursor()
  }
  private fun backspace(){
   if(formMode){if(values[formField].isNotEmpty())values[formField]=values[formField].dropLast(1);updateForm();return}
@@ -213,19 +272,63 @@ class KeyFastImeService:InputMethodService() {
   val action=currentInputEditorInfo?.imeOptions?.and(EditorInfo.IME_MASK_ACTION)?:EditorInfo.IME_ACTION_NONE
   if(action!=EditorInfo.IME_ACTION_NONE&&action!=EditorInfo.IME_ACTION_UNSPECIFIED)ic.performEditorAction(action)else ic.sendKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN,KeyEvent.KEYCODE_ENTER))
  }
- private fun refreshFromCursor(){if(formMode||!::suggestions.isInitialized)return;refreshSuggestions(currentInputConnection?.getTextBeforeCursor(48,0)?.toString().orEmpty())}
- private fun refreshSuggestions(text:String){
+
+ private fun ensureSpellChecker(){
+  if(spellSession!=null)return
+  runCatching{
+   val manager=getSystemService(TextServicesManager::class.java)
+   spellSession=manager?.newSpellCheckerSession(null,Locale("pt","BR"),object:SpellCheckerSession.SpellCheckerSessionListener{
+    override fun onGetSuggestions(results:Array<SuggestionsInfo>){
+     if(results.isEmpty())return
+     val candidates=(0 until results[0].suggestionsCount).mapNotNull{results[0].getSuggestionAt(it)}
+      .filter{it.isNotBlank()&&!it.equals(requestedToken,true)}.distinct().take(4)
+     if(requestedToken.isNotBlank()){
+      shownSuggestions=candidates
+      runOnUiThread{if(!formMode)renderWordSuggestions(requestedToken,candidates)}
+     }
+    }
+    override fun onGetSentenceSuggestions(results:Array<android.view.textservice.SentenceSuggestionsInfo>){}
+   },true)
+  }
+ }
+ private fun refreshFromCursor(){
+  if(formMode||!::suggestions.isInitialized)return
+  val before=currentInputConnection?.getTextBeforeCursor(64,0)?.toString().orEmpty()
+  val token=before.takeLastWhile{!it.isWhitespace()}.uppercase()
+  refreshSuggestions(token)
+ }
+ private fun refreshSuggestions(token:String){
   if(!::suggestions.isInitialized||formMode)return
-  suggestions.removeAllViews();val token=text.takeLastWhile{!it.isWhitespace()}.uppercase()
-  val match=if(token.isNotBlank())store.all().firstOrNull{it.trigger.equals(token,true)}else null
-  if(match!=null)suggestions.addView(TextView(this).apply{
-   this.text=match.trigger+"   ›   "+match.recipientName;textSize=14f;gravity=Gravity.CENTER_VERTICAL;setTextColor(Color.WHITE)
-   setPadding(dp(13),0,dp(13),0);background=keyBg(Color.rgb(45,75,88));isClickable=true;setOnClickListener{expand(match)}
-  },LinearLayout.LayoutParams(-1,-1))
-  else suggestions.addView(TextView(this).apply{
-   this.text="KeyFast   •   "+if(token.isBlank())"Digite seu atalho" else"Nenhum atalho correspondente"
-   setTextColor(Color.rgb(190,198,208));textSize=13f;gravity=Gravity.CENTER_VERTICAL
-  })
+  suggestions.removeAllViews()
+  if(token.isBlank()){requestedToken="";shownSuggestions=emptyList();return}
+  val match=store.all().firstOrNull{it.trigger.equals(token,true)}
+  if(match!=null){
+   requestedToken=token
+   suggestions.addView(TextView(this).apply{
+    text=match.trigger+"   ›   "+match.recipientName;textSize=14f;gravity=Gravity.CENTER_VERTICAL;setTextColor(Color.WHITE)
+    setPadding(dp(13),0,dp(13),0);background=keyBg(Color.rgb(45,75,88));isClickable=true;setOnClickListener{expand(match)}
+   },LinearLayout.LayoutParams(-1,-1))
+   return
+  }
+  requestedToken=token
+  ensureSpellChecker()
+  renderWordSuggestions(token,shownSuggestions.takeIf{requestedToken==token}.orEmpty())
+  runCatching{spellSession?.getSuggestions(TextInfo(token.lowercase()),4,false)}
+ }
+ private fun renderWordSuggestions(token:String,words:List<String>){
+  if(formMode||token!=requestedToken)return
+  suggestions.removeAllViews()
+  words.forEach{word->
+   val item=TextView(this).apply{
+    text=word;textSize=14f;gravity=Gravity.CENTER;setTextColor(Color.WHITE)
+    setPadding(dp(10),0,dp(10),0);background=keyBg(Color.rgb(45,75,88));isClickable=true
+    setOnClickListener{
+     val ic=currentInputConnection?:return@setOnClickListener
+     ic.deleteSurroundingText(token.length,0);ic.commitText(word,1);refreshFromCursor()
+    }
+   }
+   suggestions.addView(item,LinearLayout.LayoutParams(0,-1,1f).apply{setMargins(dp(2),0,dp(2),0)})
+  }
  }
  private fun expand(item:RecipientShortcut){
   val ic=currentInputConnection?:return
