@@ -33,6 +33,7 @@ class KeyFastImeService:InputMethodService() {
  private val valueViews= mutableListOf<TextView>()
  private var formPopup:PopupWindow?=null
  private var spellSession:SpellCheckerSession?=null
+ private var spellLocale:Locale?=null
  private var requestedToken=""
  private var spellRequestToken=""
  private var shownSuggestions=emptyList<String>()
@@ -144,8 +145,8 @@ class KeyFastImeService:InputMethodService() {
    outer.addView(card,LinearLayout.LayoutParams(-1,dp(57)).apply{setMargins(0,dp(3),0,dp(3))})
   }
   val actions=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.END}
-  actions.addView(actionText("CANCELAR",specialColor){closeForm()},LinearLayout.LayoutParams(dp(100),dp(38)).apply{setMargins(0,dp(10),dp(8),0)})
-  actions.addView(actionText("SALVAR",cyan){saveForm()},LinearLayout.LayoutParams(dp(92),dp(38)).apply{setMargins(0,dp(10),0,0)})
+  actions.addView(formIconButton("❌","Cancelar",specialColor){closeForm()},LinearLayout.LayoutParams(dp(52),dp(42)).apply{setMargins(0,dp(10),dp(8),0)})
+  actions.addView(formIconButton("✅","Salvar",cyan){saveForm()},LinearLayout.LayoutParams(dp(52),dp(42)).apply{setMargins(0,dp(10),0,0)})
   outer.addView(actions)
   formPopup?.dismiss()
   outer.measure(
@@ -159,14 +160,19 @@ class KeyFastImeService:InputMethodService() {
   val topMargin=dp(24)
   val targetTop=((keyboardTop-popupHeight)/2).coerceAtLeast(topMargin)
   val yOffset=targetTop-keyboardTop
-  formPopup=PopupWindow(outer,dp(320),ViewGroup.LayoutParams.WRAP_CONTENT,true).apply{
-   isOutsideTouchable=false;isFocusable=true;setBackgroundDrawable(keyBg(Color.TRANSPARENT))
+  formPopup=PopupWindow(outer,dp(320),ViewGroup.LayoutParams.WRAP_CONTENT,false).apply{
+   // O popup não pode tomar o foco do IME: as teclas precisam continuar recebendo os toques.
+   isOutsideTouchable=false;isFocusable=false;setBackgroundDrawable(keyBg(Color.TRANSPARENT))
    elevation=dp(18).toFloat();setClippingEnabled(false)
    setOnDismissListener{if(formMode){formMode=false;editingId=null;valueViews.clear();refreshFromCursor()}}
   }
   formPopup?.showAtLocation(root,Gravity.TOP or Gravity.CENTER_HORIZONTAL,0,yOffset)
  }
 
+ private fun formIconButton(icon:String,description:String,color:Int,action:()->Unit)=TextView(this).apply{
+  text=icon;textSize=22f;gravity=Gravity.CENTER;setTextColor(Color.WHITE);background=keyBg(color)
+  isClickable=true;isFocusable=false;contentDescription=description;setOnClickListener{action()}
+ }
  private fun actionText(label:String,color:Int,action:()->Unit)=TextView(this).apply{
   text=label;textSize=11f;gravity=Gravity.CENTER;setTextColor(Color.WHITE);background=keyBg(color);isClickable=true;setOnClickListener{action()}
  }
@@ -313,15 +319,23 @@ class KeyFastImeService:InputMethodService() {
  private fun ensureSpellChecker(){
   if(spellSession!=null)return
   runCatching{
-   val manager=getSystemService(TextServicesManager::class.java)
-   spellSession=manager?.newSpellCheckerSession(null,Locale("pt","BR"),object:SpellCheckerSession.SpellCheckerSessionListener{
+   val manager=getSystemService(TextServicesManager::class.java)?:return
+   // Usa a variante de português realmente habilitada no aparelho (pt_BR, pt_PT ou pt).
+   val enabled=manager.enabledSpellCheckerInfos.orEmpty()
+   val portugueseSubtype=enabled.asSequence().flatMap{info->
+    (0 until info.subtypeCount).asSequence().map{info.getSubtypeAt(it)}
+   }.firstOrNull{it.locale.replace('_','-').lowercase(Locale.ROOT).startsWith("pt")}
+   val locale=portugueseSubtype?.locale?.replace('_','-')?.let{Locale.forLanguageTag(it)}
+    ?.takeIf{it.language=="pt"} ?: Locale("pt")
+   spellLocale=locale
+   spellSession=manager.newSpellCheckerSession(null,locale,object:SpellCheckerSession.SpellCheckerSessionListener{
     override fun onGetSuggestions(results:Array<SuggestionsInfo>){
      val responseToken=spellRequestToken
      if(results.isEmpty() || responseToken.isBlank() || responseToken!=requestedToken)return
      val candidates=(0 until results[0].suggestionsCount).mapNotNull{results[0].getSuggestionAt(it)}
       .filter{it.isNotBlank()&&!it.equals(responseToken,true)}.distinct().take(4)
      shownSuggestions=candidates
-     Handler(Looper.getMainLooper()).post{if(!formMode)renderWordSuggestions(responseToken,candidates)}
+     Handler(Looper.getMainLooper()).post{if(!formMode && responseToken==requestedToken)renderWordSuggestions(responseToken,candidates)}
     }
     override fun onGetSentenceSuggestions(results:Array<android.view.textservice.SentenceSuggestionsInfo>){}
    },true)
@@ -349,6 +363,7 @@ class KeyFastImeService:InputMethodService() {
   if(token!=requestedToken){requestedToken=token;shownSuggestions=emptyList()}
   ensureSpellChecker()
   renderWordSuggestions(token,shownSuggestions)
+  spellRequestToken=token
   spellRequestToken=token
   runCatching{spellSession?.getSuggestions(arrayOf(TextInfo(token)),4,false)}
  }
