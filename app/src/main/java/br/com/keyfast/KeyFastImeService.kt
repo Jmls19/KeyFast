@@ -5,6 +5,7 @@ import android.view.inputmethod.EditorInfo
 import android.graphics.Color
 import android.graphics.drawable.GradientDrawable
 import android.view.Gravity
+import android.os.Build
 import android.widget.*
 
 class KeyFastImeService:InputMethodService() {
@@ -21,13 +22,28 @@ class KeyFastImeService:InputMethodService() {
  override fun onCreate() { super.onCreate(); store=ShortcutStore(this) }
 
  override fun onCreateInputView():View {
-  val keyboardHeight=(resources.displayMetrics.heightPixels*0.34f).toInt()
+  val baseKeyboardHeight=(resources.displayMetrics.heightPixels*0.34f).toInt()
   root=LinearLayout(this).apply {
    orientation=LinearLayout.VERTICAL
    setPadding(dp(4),dp(5),dp(4),dp(5))
    setBackgroundColor(panel)
-   minimumHeight=keyboardHeight
-   layoutParams=ViewGroup.LayoutParams(-1,keyboardHeight)
+   minimumHeight=baseKeyboardHeight
+   layoutParams=ViewGroup.LayoutParams(-1,baseKeyboardHeight)
+   // Reserve the system navigation/gesture area below the keys.
+   setOnApplyWindowInsetsListener { view, insets ->
+    val bottomInset = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+     insets.getInsets(WindowInsets.Type.navigationBars()).bottom
+    } else {
+     @Suppress("DEPRECATION")
+     insets.systemWindowInsetBottom
+    }
+    view.setPadding(dp(4), dp(5), dp(4), dp(5) + bottomInset)
+    view.layoutParams = view.layoutParams.apply {
+     height = baseKeyboardHeight + bottomInset
+    }
+    insets
+   }
+   post { requestApplyInsets() }
   }
   suggestions=LinearLayout(this).apply {
    orientation=LinearLayout.HORIZONTAL
