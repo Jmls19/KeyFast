@@ -32,6 +32,7 @@ class KeyFastImeService:InputMethodService() {
  private var formPopup:PopupWindow?=null
  private var spellSession:SpellCheckerSession?=null
  private var requestedToken=""
+ private var spellRequestToken=""
  private var shownSuggestions=emptyList<String>()
  private val panel=Color.rgb(24,28,35)
  private val keyColor=Color.rgb(60,66,76)
@@ -282,9 +283,10 @@ class KeyFastImeService:InputMethodService() {
      if(results.isEmpty())return
      val candidates=(0 until results[0].suggestionsCount).mapNotNull{results[0].getSuggestionAt(it)}
       .filter{it.isNotBlank()&&!it.equals(requestedToken,true)}.distinct().take(4)
-     if(requestedToken.isNotBlank()){
+     val responseToken=spellRequestToken
+     if(responseToken.isNotBlank() && responseToken==requestedToken){
       shownSuggestions=candidates
-      runOnUiThread{if(!formMode)renderWordSuggestions(requestedToken,candidates)}
+      runOnUiThread{if(!formMode)renderWordSuggestions(responseToken,candidates)}
      }
     }
     override fun onGetSentenceSuggestions(results:Array<android.view.textservice.SentenceSuggestionsInfo>){}
@@ -310,9 +312,10 @@ class KeyFastImeService:InputMethodService() {
    },LinearLayout.LayoutParams(-1,-1))
    return
   }
-  requestedToken=token
+  if(token!=requestedToken){requestedToken=token;shownSuggestions=emptyList()}
   ensureSpellChecker()
-  renderWordSuggestions(token,shownSuggestions.takeIf{requestedToken==token}.orEmpty())
+  renderWordSuggestions(token,shownSuggestions)
+  spellRequestToken=token
   runCatching{spellSession?.getSuggestions(TextInfo(token.lowercase()),4,false)}
  }
  private fun renderWordSuggestions(token:String,words:List<String>){
