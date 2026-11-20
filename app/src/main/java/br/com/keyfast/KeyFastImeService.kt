@@ -1,6 +1,10 @@
 package br.com.keyfast
 
 import android.inputmethodservice.InputMethodService
+import android.animation.AnimatorSet
+import android.animation.ObjectAnimator
+import android.view.animation.DecelerateInterpolator
+import android.graphics.Typeface
 import android.view.*
 import android.view.inputmethod.EditorInfo
 import android.view.textservice.TextInfo
@@ -37,10 +41,11 @@ class KeyFastImeService:InputMethodService() {
  private var requestedToken=""
  private var spellRequestToken=""
  private var shownSuggestions=emptyList<String>()
- private val panel=Color.rgb(24,28,35)
- private val keyColor=Color.rgb(60,66,76)
- private val specialColor=Color.rgb(55,63,75)
+ private val panel=Color.rgb(16,24,39)
+ private val keyColor=Color.rgb(38,52,73)
+ private val specialColor=Color.rgb(31,45,65)
  private val cyan=Color.rgb(32,199,217)
+ private val ink=Color.rgb(12,19,32)
 
  override fun onCreate(){ super.onCreate(); store=ShortcutStore(this) }
  private fun dp(v:Int)=(v*resources.displayMetrics.density+0.5f).toInt()
@@ -60,7 +65,7 @@ class KeyFastImeService:InputMethodService() {
   suggestions=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER_VERTICAL}
   bar.addView(suggestions,LinearLayout.LayoutParams(0,-1,1f))
   val manage=TextView(this).apply{
-   text="⚙";textSize=24f;gravity=Gravity.CENTER;setTextColor(Color.WHITE)
+   text="⚙";textSize=24f;gravity=Gravity.CENTER;setTextColor(cyan);typeface=Typeface.create("sans-serif",Typeface.BOLD)
    background=keyBg(Color.rgb(35,91,105));isClickable=true;setPadding(dp(5),0,dp(5),0)
    contentDescription="Gerenciar atalhos";setOnClickListener{showManageMenu(this)}
   }
@@ -138,7 +143,7 @@ class KeyFastImeService:InputMethodService() {
    card.addView(TextView(this).apply{text=labels[i];textSize=9f;setTextColor(cyan)})
    val value=TextView(this).apply{
     text=values[i].ifBlank{"Toque aqui e digite no teclado"}
-    textSize=14f;setTextColor(Color.WHITE);gravity=Gravity.CENTER_VERTICAL;maxLines=1
+    textSize=14f;setTextColor(Color.WHITE);typeface=Typeface.create("sans-serif",Typeface.NORMAL);gravity=Gravity.CENTER_VERTICAL;maxLines=1
     ellipsize=android.text.TextUtils.TruncateAt.END
    }
    valueViews.add(value);card.addView(value,LinearLayout.LayoutParams(-1,dp(29)))
@@ -196,17 +201,51 @@ class KeyFastImeService:InputMethodService() {
  }
 
  private fun showManageMenu(anchor:View){
-  val box=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setPadding(dp(5),dp(5),dp(5),dp(5));background=keyBg(Color.rgb(32,42,56))}
+  val width=dp(196);val height=dp(176)
+  val fan=FrameLayout(this).apply{clipChildren=false;clipToPadding=false}
+  val labels=listOf("NOVO","EDITAR","EXCLUIR")
+  val colors=listOf(cyan,Color.rgb(29,137,166),Color.rgb(38,52,73))
+  val positions=listOf(Triple(130,12,0),Triple(76,62,1),Triple(20,116,2))
   lateinit var popup:PopupWindow
-  listOf("NOVO","EDITAR","EXCLUIR").forEach{choice->
-   box.addView(TextView(this).apply{
-    text=choice;textSize=14f;setTextColor(Color.WHITE);gravity=Gravity.CENTER_VERTICAL;setPadding(dp(18),0,dp(18),0);isClickable=true
-    setBackgroundResource(android.R.drawable.list_selector_background)
-    setOnClickListener{popup.dismiss();when(choice){"NOVO"->showForm(null);"EDITAR"->showList(true);else->showList(false)}}
-   },LinearLayout.LayoutParams(dp(150),dp(42)))
+  positions.forEachIndexed{index,pos->
+   val button=TextView(this).apply{
+    text=labels[index];textSize=11f;typeface=Typeface.create("sans-serif",Typeface.BOLD)
+    gravity=Gravity.CENTER;setTextColor(Color.WHITE);background=GradientDrawable().apply{
+     setColor(colors[index]);cornerRadius=dp(18).toFloat()
+     setStroke(dp(1),Color.argb(75,255,255,255))
+    }
+    elevation=dp(7).toFloat();isClickable=true;isFocusable=false
+    setOnClickListener{
+     popup.dismiss()
+     when(index){0->showForm(null);1->showList(true);else->showList(false)}
+    }
+   }
+   val size=dp(66)
+   val lp=FrameLayout.LayoutParams(size,dp(42),Gravity.TOP or Gravity.LEFT).apply{
+    leftMargin=dp(pos.first);topMargin=dp(pos.second)
+   }
+   fan.addView(button,lp)
+   button.alpha=0f;button.scaleX=.45f;button.scaleY=.45f
   }
-  popup=PopupWindow(box,dp(160),ViewGroup.LayoutParams.WRAP_CONTENT,true);popup.isOutsideTouchable=true
-  popup.setBackgroundDrawable(keyBg(Color.rgb(32,42,56)));popup.elevation=dp(10).toFloat();popup.showAsDropDown(anchor,0,dp(3),Gravity.END)
+  popup=PopupWindow(fan,width,height,false).apply{
+   isOutsideTouchable=true;isFocusable=false;setBackgroundDrawable(keyBg(Color.TRANSPARENT))
+   elevation=dp(12).toFloat();setClippingEnabled(false)
+   setOnDismissListener{fan.animate().alpha(0f).setDuration(90).start()}
+  }
+  val loc=IntArray(2);anchor.getLocationOnScreen(loc)
+  val screenW=resources.displayMetrics.widthPixels
+  val x=(screenW-loc[0]-anchor.width).coerceAtLeast(dp(4))
+  val y=(loc[1]+anchor.height-dp(5)).coerceAtLeast(dp(4))
+  popup.showAtLocation(root,Gravity.TOP or Gravity.LEFT,x,y)
+  for(i in 0 until fan.childCount){
+   val child=fan.getChildAt(i)
+   val lp=child.layoutParams as FrameLayout.LayoutParams
+   val dx=dp(176)-lp.leftMargin-dp(33)
+   val dy=dp(8)-lp.topMargin
+   child.translationX=dx.toFloat();child.translationY=dy.toFloat()
+   child.animate().alpha(1f).scaleX(1f).scaleY(1f).translationX(0f).translationY(0f)
+    .setStartDelay((i*45).toLong()).setDuration(230).setInterpolator(DecelerateInterpolator()).start()
+  }
  }
  private fun showList(edit:Boolean){
   val items=store.all().sortedBy{it.trigger.lowercase()}
@@ -265,7 +304,7 @@ class KeyFastImeService:InputMethodService() {
  private fun keyBg(color:Int)=GradientDrawable().apply{setColor(color);cornerRadius=dp(8).toFloat()}
  private fun addKey(row:LinearLayout,label:String,weight:Float,color:Int,longPress:(()->Unit)?=null,action:()->Unit){
   val key=TextView(this).apply{
-   text=label;textSize=if(label=="ESPAÇO")12f else 19f;gravity=Gravity.CENTER;setTextColor(Color.WHITE)
+   text=label;textSize=if(label=="ESPAÇO")12f else 19f;gravity=Gravity.CENTER;setTextColor(Color.WHITE);typeface=Typeface.create("sans-serif",Typeface.MEDIUM)
    val mask=keyBg(Color.WHITE)
    background=if(Build.VERSION.SDK_INT>=Build.VERSION_CODES.LOLLIPOP)RippleDrawable(ColorStateList.valueOf(Color.argb(95,255,255,255)),keyBg(color),mask)else keyBg(color)
    isClickable=true;isFocusable=true;setOnClickListener{action()};if(longPress!=null)setOnLongClickListener{longPress();true}
