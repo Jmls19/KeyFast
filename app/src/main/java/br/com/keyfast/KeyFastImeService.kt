@@ -284,9 +284,9 @@ class KeyFastImeService:InputMethodService() {
   for(i in 0 until fan.childCount){
    val child=fan.getChildAt(i)
    child.translationX=width.toFloat()
-   child.translationY=dp(12).toFloat()
-   child.animate().alpha(1f).scaleX(1f).scaleY(1f).translationX(0f).translationY(0f)
-    .setStartDelay((i*55).toLong()).setDuration(260).setInterpolator(DecelerateInterpolator()).start()
+   child.animate().translationX(0f)
+    .setStartDelay((i*45).toLong()).setDuration(240).setInterpolator(DecelerateInterpolator()).start()
+   child.animate().alpha(1f).setStartDelay((i*45).toLong()).setDuration(180).start()
   }
  }
  private fun showList(edit:Boolean){
