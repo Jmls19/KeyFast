@@ -385,7 +385,12 @@ class KeyFastImeService:InputMethodService() {
       else->true
      }
     }
-   }else setOnClickListener{action()}
+   }else {
+    setOnClickListener{action()}
+    // Vogais e C exibem as variantes somente ao manter a tecla pressionada.
+    // O listener de long click consome o gesto e evita inserir a letra base.
+    if(longPress!=null) setOnLongClickListener{longPress();true}
+   }
    if(label=="—")contentDescription="Espaço"
   }
   row.addView(key,LinearLayout.LayoutParams(0,-1,weight).apply{setMargins(dp(3),dp(3),dp(3),dp(3))})
