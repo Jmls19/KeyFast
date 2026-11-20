@@ -68,7 +68,7 @@ class KeyFastImeService:InputMethodService() {
   }else{
    addRow(listOf("1","2","3","4","5","6","7","8","9","0"))
    addRow(listOf("@","#","$","%","&","-","+","(",")","/"))
-   addRow(listOf("*","\\"","'",":",";","!","?","ABC","⌫"))
+   addRow(listOf("*","\"","'",":",";","!","?","ABC","⌫"))
   }
   val bottom=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL}
   addKey(bottom,if(symbols)"ABC" else "?123",1.25f,specialColor){symbols=!symbols;buildKeys()}
@@ -166,7 +166,11 @@ class KeyFastImeService:InputMethodService() {
   labels.forEach{label->
    val accent=!number&&label.lowercase() in setOf("a","e","i","o","u","c")
    addKey(row,label,1f,if(number)specialColor else keyColor,{if(accent)showAccentOptions(label)}) {
-    when(label){"ABC"->{symbols=false;buildKeys()},"⌫"->backspace();else->if(label.length==1)type(label)}
+    when(label) {
+     "ABC" -> { symbols=false; buildKeys() }
+     "⌫" -> backspace()
+     else -> if(label.length==1) type(label)
+    }
    }
   }
   if(right>0)row.addView(Space(this),LinearLayout.LayoutParams(0,1,right))
