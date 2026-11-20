@@ -1,11 +1,14 @@
 package br.com.keyfast
+
 import android.inputmethodservice.InputMethodService
 import android.view.*
 import android.view.inputmethod.EditorInfo
 import android.graphics.Color
 import android.graphics.drawable.GradientDrawable
-import android.view.Gravity
+import android.graphics.drawable.RippleDrawable
+import android.content.res.ColorStateList
 import android.os.Build
+import android.view.Gravity
 import android.widget.*
 
 class KeyFastImeService:InputMethodService() {
@@ -29,7 +32,6 @@ class KeyFastImeService:InputMethodService() {
    setBackgroundColor(panel)
    minimumHeight=baseKeyboardHeight
    layoutParams=ViewGroup.LayoutParams(-1,baseKeyboardHeight)
-   // Reserve the system navigation/gesture area below the keys.
    setOnApplyWindowInsetsListener { view, insets ->
     val bottomInset = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
      insets.getInsets(WindowInsets.Type.navigationBars()).bottom
@@ -37,10 +39,8 @@ class KeyFastImeService:InputMethodService() {
      @Suppress("DEPRECATION")
      insets.systemWindowInsetBottom
     }
-    view.setPadding(dp(4), dp(5), dp(4), dp(5) + bottomInset)
-    view.layoutParams = view.layoutParams.apply {
-     height = baseKeyboardHeight + bottomInset
-    }
+    view.setPadding(dp(4),dp(5),dp(4),dp(5)+bottomInset)
+    view.layoutParams=view.layoutParams.apply { height=baseKeyboardHeight+bottomInset }
     insets
    }
    post { requestApplyInsets() }
@@ -50,56 +50,114 @@ class KeyFastImeService:InputMethodService() {
    gravity=Gravity.CENTER_VERTICAL
    setPadding(dp(5),0,dp(5),dp(4))
   }
-  root.addView(suggestions,LinearLayout.LayoutParams(-1,dp(42)))
+  root.addView(suggestions,LinearLayout.LayoutParams(-1,dp(38)))
   buildKeys()
   refreshFromCursor()
   return root
  }
 
- private fun dp(value:Int)= (value*resources.displayMetrics.density+0.5f).toInt()
+ private fun dp(value:Int)=(value*resources.displayMetrics.density+0.5f).toInt()
 
  private fun buildKeys() {
   while(root.childCount>1) root.removeViewAt(1)
   if(!symbols) {
-   addRow(listOf("q","w","e","r","t","y","u","i","o","p"))
-   addRow(listOf("a","s","d","f","g","h","j","k","l"),0.5f,0.5f)
-   addRow(listOf("⇧","z","x","c","v","b","n","m","⌫"),0.2f,0.2f)
+   // Dedicated number row, like a full-size QWERTY keyboard.
+   addRow(listOf("1","2","3","4","5","6","7","8","9","0"),0.0f,0.0f,true)
+   val letters=listOf("q","w","e","r","t","y","u","i","o","p")
+   addRow(if(caps) letters.map{it.uppercase()} else letters)
+   val middle=listOf("a","s","d","f","g","h","j","k","l")
+   addRow(if(caps) middle.map{it.uppercase()} else middle,0.5f,0.5f)
+   val lower=listOf("z","x","c","v","b","n","m")
+   val lowerRow=LinearLayout(this).apply { orientation=LinearLayout.HORIZONTAL }
+   addKey(lowerRow,"⇧",1.25f,specialColor) { caps=!caps; buildKeys() }
+   lower.forEach { letter ->
+    val shown=if(caps) letter.uppercase() else letter
+    addKey(lowerRow,shown,1f,keyColor) { typeLetter(letter) }
+   }
+   addKey(lowerRow,"⌫",1.25f,specialColor) {
+    currentInputConnection?.let {
+     if(!it.deleteSurroundingText(1,0)) it.sendKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN,KeyEvent.KEYCODE_DEL))
+     refreshFromCursor()
+    }
+   }
+   root.addView(lowerRow,LinearLayout.LayoutParams(-1,0,1f))
   } else {
    addRow(listOf("1","2","3","4","5","6","7","8","9","0"))
    addRow(listOf("@","#","$","%","&","-","+","(",")","/"))
-   addRow(listOf("ABC","*","\"","'",":",";","!","?","⌫"),0.2f,0.2f)
+   addRow(listOf("*","\"","'",":",";","!","?","ABC","⌫"))
   }
   val bottom=LinearLayout(this).apply { orientation=LinearLayout.HORIZONTAL }
-  addKey(bottom,if(symbols) "ABC" else "?123",1.25f, specialColor) { symbols=!symbols; buildKeys() }
-  addKey(bottom,",",0.75f, specialColor) { type(",") }
+  addKey(bottom,if(symbols) "ABC" else "?123",1.25f,specialColor) { symbols=!symbols; buildKeys() }
+  addKey(bottom,",",0.75f,specialColor) { type(",") }
   addKey(bottom,"ESPAÇO",4.5f,keyColor) { type(" ") }
   addKey(bottom,".",0.75f,specialColor) { type(".") }
   addKey(bottom,"↵",1.25f,cyan) { enter() }
   root.addView(bottom,LinearLayout.LayoutParams(-1,0,1f))
  }
 
- private fun addRow(labels:List<String>,left:Float=0f,right:Float=0f) {
+ private fun addRow(labels:List<String>,left:Float=0f,right:Float=0f,numberRow:Boolean=false) {
   val row=LinearLayout(this).apply { orientation=LinearLayout.HORIZONTAL }
   if(left>0f) row.addView(Space(this),LinearLayout.LayoutParams(0,1,left))
   labels.forEach { label ->
-   val color=when(label) {
-    "⇧","⌫","ABC" -> specialColor
-    else -> keyColor
-   }
-   addKey(row,label,1f,color) {
-    when(label) {
-     "⇧" -> { caps=!caps; refreshFromCursor() }
-     "⌫" -> currentInputConnection?.let {
+   addKey(row,label,1f,if(numberRow) specialColor else keyColor) {
+    if(label=="ABC") { symbols=false; buildKeys() }
+    else if(label=="⌫") {
+     currentInputConnection?.let {
       if(!it.deleteSurroundingText(1,0)) it.sendKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN,KeyEvent.KEYCODE_DEL))
       refreshFromCursor()
      }
-     "ABC" -> { symbols=false; buildKeys() }
-     else -> type(if(!symbols && caps) label.uppercase() else label)
-    }
+    } else if(label.length==1 && label[0].isDigit()) type(label)
+    else if(label.length==1) type(label)
    }
   }
   if(right>0f) row.addView(Space(this),LinearLayout.LayoutParams(0,1,right))
   root.addView(row,LinearLayout.LayoutParams(-1,0,1f))
+ }
+
+ private fun typeLetter(letter:String) {
+  val lower=letter.lowercase()
+  val choices=when(lower) {
+   "a" -> listOf("a","á","à","â","ã")
+   "e" -> listOf("e","é","ê")
+   "i" -> listOf("i","í")
+   "o" -> listOf("o","ó","ô","õ")
+   "u" -> listOf("u","ú")
+   "c" -> listOf("c","ç")
+   else -> emptyList()
+  }
+  if(choices.isEmpty()) type(if(caps) lower.uppercase() else lower)
+  else showAccentPopup(choices,if(caps) lower.uppercase() else lower)
+ }
+
+ private fun showAccentPopup(options:List<String>,base:String) {
+  val content=LinearLayout(this).apply {
+   orientation=LinearLayout.HORIZONTAL
+   setPadding(dp(5),dp(5),dp(5),dp(5))
+   setBackgroundColor(Color.rgb(37,43,53))
+  }
+  options.forEach { option ->
+   val shown=if(caps) option.uppercase() else option
+   val item=TextView(this).apply {
+    text=shown
+    textSize=22f
+    gravity=Gravity.CENTER
+    setTextColor(Color.WHITE)
+    background=keyBackground(cyan)
+    isClickable=true
+    setOnClickListener { type(shown); (content.parent as? PopupWindow)?.dismiss() }
+   }
+   content.addView(item,LinearLayout.LayoutParams(dp(48),dp(52)).apply { setMargins(dp(2),0,dp(2),0) })
+  }
+  val popup=PopupWindow(content,ViewGroup.LayoutParams.WRAP_CONTENT,ViewGroup.LayoutParams.WRAP_CONTENT,true)
+  popup.isOutsideTouchable=true
+  popup.setBackgroundDrawable(GradientDrawable().apply { setColor(Color.TRANSPARENT) })
+  popup.elevation=dp(8).toFloat()
+  // Place above the keyboard's suggestion strip, safely inside the IME window.
+  popup.showAtLocation(root,Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL,0,dp(190))
+ }
+
+ private fun keyBackground(color:Int):GradientDrawable=GradientDrawable().apply {
+  setColor(color); cornerRadius=dp(8).toFloat()
  }
 
  private fun addKey(row:LinearLayout,label:String,weight:Float,color:Int,action:()->Unit) {
@@ -108,17 +166,17 @@ class KeyFastImeService:InputMethodService() {
    textSize=if(label=="ESPAÇO") 12f else 19f
    gravity=Gravity.CENTER
    setTextColor(Color.WHITE)
-   background=GradientDrawable().apply {
-    setColor(color)
-    cornerRadius=dp(if(label=="ESPAÇO") 9 else 7).toFloat()
-   }
+   val mask=keyBackground(Color.WHITE)
+   background=if(Build.VERSION.SDK_INT>=Build.VERSION_CODES.LOLLIPOP)
+    RippleDrawable(ColorStateList.valueOf(Color.argb(95,255,255,255)),keyBackground(color),mask)
+    else keyBackground(color)
    isClickable=true
    isFocusable=true
    setOnClickListener { action() }
    if(label=="ESPAÇO") contentDescription="Espaço"
   }
   row.addView(key,LinearLayout.LayoutParams(0,-1,weight).apply {
-   setMargins(dp(2),dp(3),dp(2),dp(3))
+   setMargins(dp(2),dp(2),dp(2),dp(2))
   })
  }
 
@@ -147,21 +205,16 @@ class KeyFastImeService:InputMethodService() {
   if(match!=null) {
    val suggestion=TextView(this).apply {
     this.text=match.trigger+"   ›   "+match.recipientName
-    textSize=14f
-    gravity=Gravity.CENTER_VERTICAL
-    setTextColor(Color.WHITE)
+    textSize=14f; gravity=Gravity.CENTER_VERTICAL; setTextColor(Color.WHITE)
     setPadding(dp(13),0,dp(13),0)
-    background=GradientDrawable().apply { setColor(Color.rgb(45,75,88)); cornerRadius=dp(9).toFloat() }
-    isClickable=true
-    setOnClickListener { expand(match) }
+    background=keyBackground(Color.rgb(45,75,88))
+    isClickable=true; setOnClickListener { expand(match) }
    }
    suggestions.addView(suggestion,LinearLayout.LayoutParams(-1,-1))
   } else {
    suggestions.addView(TextView(this).apply {
     this.text="KeyFast   •   "+if(token.isBlank()) "Digite seu atalho" else "Nenhum atalho correspondente"
-    setTextColor(Color.rgb(190,198,208))
-    textSize=13f
-    gravity=Gravity.CENTER_VERTICAL
+    setTextColor(Color.rgb(190,198,208)); textSize=13f; gravity=Gravity.CENTER_VERTICAL
    })
   }
  }
