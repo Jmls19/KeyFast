@@ -12,6 +12,8 @@ import android.graphics.drawable.GradientDrawable
 import android.graphics.drawable.RippleDrawable
 import android.content.res.ColorStateList
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
 import android.view.Gravity
 import android.widget.*
 import java.util.Locale
@@ -319,7 +321,7 @@ class KeyFastImeService:InputMethodService() {
      val candidates=(0 until results[0].suggestionsCount).mapNotNull{results[0].getSuggestionAt(it)}
       .filter{it.isNotBlank()&&!it.equals(responseToken,true)}.distinct().take(4)
      shownSuggestions=candidates
-     runOnUiThread{if(!formMode)renderWordSuggestions(responseToken,candidates)}
+     Handler(Looper.getMainLooper()).post{if(!formMode)renderWordSuggestions(responseToken,candidates)}
     }
     override fun onGetSentenceSuggestions(results:Array<android.view.textservice.SentenceSuggestionsInfo>){}
    },true)
@@ -348,7 +350,7 @@ class KeyFastImeService:InputMethodService() {
   ensureSpellChecker()
   renderWordSuggestions(token,shownSuggestions)
   spellRequestToken=token
-  runCatching{spellSession?.getSuggestions(TextInfo(token),4,false)}
+  runCatching{spellSession?.getSuggestions(arrayOf(TextInfo(token)),4,false)}
  }
  private fun renderWordSuggestions(token:String,words:List<String>){
   if(formMode||token!=requestedToken)return
