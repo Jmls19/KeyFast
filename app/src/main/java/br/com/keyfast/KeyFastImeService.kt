@@ -5,6 +5,11 @@ import android.animation.AnimatorSet
 import android.animation.ObjectAnimator
 import android.view.animation.DecelerateInterpolator
 import android.graphics.Typeface
+import android.text.SpannableString
+import android.text.Spanned
+import android.text.TextPaint
+import android.text.style.CharacterStyle
+import android.animation.ValueAnimator
 import android.view.*
 import android.view.inputmethod.EditorInfo
 import android.view.textservice.TextInfo
@@ -34,6 +39,7 @@ class KeyFastImeService:InputMethodService() {
  private var editingId:String?=null
  private var formField=0
  private val values= mutableListOf("","","")
+ private val cursorAlphas= mutableMapOf<Int,Int>()
  private val valueViews= mutableListOf<TextView>()
  private var formPopup:PopupWindow?=null
  private var spellSession:SpellCheckerSession?=null
@@ -144,13 +150,9 @@ class KeyFastImeService:InputMethodService() {
    }
    card.addView(TextView(this).apply{text=labels[i];textSize=9f;typeface=interMedium;setTextColor(cyan)})
    val value=TextView(this).apply{
-    text=if(i==formField) values[i]+"│" else values[i].ifBlank{"Toque aqui e digite no teclado"}
+    text=formFieldText(i)
     textSize=14f;setTextColor(Color.WHITE);typeface=interRegular;gravity=Gravity.CENTER_VERTICAL;maxLines=1
     ellipsize=android.text.TextUtils.TruncateAt.END
-    if(i==formField){
-     val blink=ObjectAnimator.ofFloat(this,"alpha",1f,0.25f).apply{duration=560;repeatCount=ObjectAnimator.INFINITE;repeatMode=ObjectAnimator.REVERSE}
-     blink.start()
-    }
    }
    valueViews.add(value);card.addView(value,LinearLayout.LayoutParams(-1,dp(29)))
    outer.addView(card,LinearLayout.LayoutParams(-1,dp(57)).apply{setMargins(0,dp(3),0,dp(3))})
@@ -187,11 +189,24 @@ class KeyFastImeService:InputMethodService() {
  private fun actionText(label:String,color:Int,action:()->Unit)=TextView(this).apply{
   text=label;textSize=11f;gravity=Gravity.CENTER;typeface=interMedium;setTextColor(Color.WHITE);background=keyBg(color);isClickable=true;setOnClickListener{action()}
  }
+ private fun formFieldText(index:Int):CharSequence {
+  val value=values[index]
+  if(index!=formField)return value.ifBlank{"Toque aqui e digite no teclado"}
+  val text=SpannableString(value+"│")
+  val span=object:CharacterStyle(){
+   override fun updateDrawState(tp:TextPaint){tp.alpha=cursorAlphas[index]?:255}
+  }
+  text.setSpan(span,value.length,value.length+1,Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+  ValueAnimator.ofInt(255,35).apply{
+   duration=520;repeatCount=ValueAnimator.INFINITE;repeatMode=ValueAnimator.REVERSE
+   addUpdateListener{cursorAlphas[index]=it.animatedValue as Int;valueViews.getOrNull(index)?.invalidate()}
+   start()
+  }
+  return text
+ }
  private fun updateForm(){
   valueViews.forEachIndexed{i,v->
-   v.text=if(i==formField) values[i]+"│" else values[i].ifBlank{"Toque aqui e digite no teclado"}
-   v.alpha=1f
-   if(i==formField){ObjectAnimator.ofFloat(v,"alpha",1f,0.25f).apply{duration=560;repeatCount=ObjectAnimator.INFINITE;repeatMode=ObjectAnimator.REVERSE;start()}}
+   v.text=formFieldText(i)
    (v.parent as? View)?.background=keyBg(if(i==formField)Color.rgb(35,91,105)else Color.rgb(38,52,73))
   }
  }
