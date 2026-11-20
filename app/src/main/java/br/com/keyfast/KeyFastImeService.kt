@@ -240,53 +240,48 @@ class KeyFastImeService:InputMethodService() {
  }
 
  private fun showManageMenu(anchor:View){
-  val width=dp(214);val height=dp(154)
-  val fan=FrameLayout(this).apply{clipChildren=false;clipToPadding=false}
-  val labels=listOf("NOVO","EDITAR","EXCLUIR")
-  val colors=listOf(cyan,Color.rgb(29,137,166),Color.rgb(38,52,73))
-  // Leque em arco: os botões sobem e se afastam para a esquerda a partir da engrenagem.
-  // Cada destino tem uma altura e um recuo próprios; não formam uma fileira nem uma coluna.
-  val positions=listOf(Triple(128,4,0),Triple(68,54,1),Triple(8,104,2))
+  // Faixa horizontal sobre as sugestões, imediatamente à esquerda da engrenagem.
+  val width=dp(244);val height=dp(42)
+  val row=LinearLayout(this).apply{
+   orientation=LinearLayout.HORIZONTAL
+   gravity=Gravity.CENTER_VERTICAL
+   setPadding(dp(2),0,dp(2),0)
+   clipChildren=false;clipToPadding=false
+  }
   lateinit var popup:PopupWindow
-  positions.forEachIndexed{index,pos->
+  fun addMenuButton(label:String,color:Int,buttonWidth:Int,onClick:()->Unit){
    val button=TextView(this).apply{
-    text=labels[index];textSize=11f;typeface=interMedium
-    gravity=Gravity.CENTER;setTextColor(Color.WHITE);background=GradientDrawable().apply{
-     setColor(colors[index]);cornerRadius=dp(18).toFloat()
+    text=label;textSize=if(label=="✕")18f else 10.5f;typeface=interMedium
+    gravity=Gravity.CENTER;setTextColor(Color.WHITE)
+    background=GradientDrawable().apply{
+     setColor(color);cornerRadius=dp(16).toFloat()
      setStroke(dp(1),Color.argb(75,255,255,255))
     }
-    elevation=dp(7).toFloat();isClickable=true;isFocusable=false
-    setOnClickListener{
-     popup.dismiss()
-     when(index){0->showForm(null);1->showList(true);else->showList(false)}
-    }
+    elevation=dp(5).toFloat();isClickable=true;isFocusable=false
+    alpha=0f;translationX=dp(55).toFloat()
+    setOnClickListener{popup.dismiss();onClick()}
    }
-   val size=dp(76)
-   val lp=FrameLayout.LayoutParams(size,dp(42),Gravity.TOP or Gravity.LEFT).apply{
-    leftMargin=dp(pos.first);topMargin=dp(pos.second)
-   }
-   fan.addView(button,lp)
-   button.alpha=0f;button.scaleX=.45f;button.scaleY=.45f
+   row.addView(button,LinearLayout.LayoutParams(dp(buttonWidth),dp(34)).apply{
+    setMargins(dp(2),0,dp(2),0)
+   })
   }
-  popup=PopupWindow(fan,width,height,false).apply{
-   isOutsideTouchable=true;isFocusable=false;setBackgroundDrawable(keyBg(Color.TRANSPARENT))
+  addMenuButton("✕",Color.rgb(125,55,60),30){}
+  addMenuButton("NOVO",cyan,54){showForm(null)}
+  addMenuButton("ALTERAR",Color.rgb(29,137,166),68){showList(true)}
+  addMenuButton("EXCLUIR",Color.rgb(38,52,73),64){showList(false)}
+  popup=PopupWindow(row,width,height,false).apply{
+   isOutsideTouchable=true;isFocusable=false
+   setBackgroundDrawable(keyBg(Color.TRANSPARENT))
    elevation=dp(12).toFloat();setClippingEnabled(false)
-   setOnDismissListener{fan.animate().alpha(0f).setDuration(90).start()}
   }
-  // Offsets relativos à janela do IME; getLocationOnScreen deslocava o menu
-  // para fora da área visível do teclado.
   val loc=IntArray(2);anchor.getLocationInWindow(loc)
-  // O painel fica imediatamente à esquerda da engrenagem; os três comandos
-  // atravessam visualmente a frente do ícone, deslizando da direita para a esquerda.
   val x=(loc[0]+anchor.width-width).coerceAtLeast(dp(4))
   val y=(loc[1]+(anchor.height-height)/2).coerceAtLeast(dp(4))
   popup.showAtLocation(root,Gravity.TOP or Gravity.LEFT,x,y)
-  for(i in 0 until fan.childCount){
-   val child=fan.getChildAt(i)
-   child.translationX=width.toFloat()
-   child.animate().translationX(0f)
-    .setStartDelay((i*45).toLong()).setDuration(240).setInterpolator(DecelerateInterpolator()).start()
-   child.animate().alpha(1f).setStartDelay((i*45).toLong()).setDuration(180).start()
+  for(i in 0 until row.childCount){
+   row.getChildAt(i).animate().translationX(0f).alpha(1f)
+    .setStartDelay((i*35).toLong()).setDuration(230)
+    .setInterpolator(DecelerateInterpolator()).start()
   }
  }
  private fun showList(edit:Boolean){
