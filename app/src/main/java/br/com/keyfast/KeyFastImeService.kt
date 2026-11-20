@@ -40,6 +40,7 @@ class KeyFastImeService:InputMethodService() {
  private var formField=0
  private val values= mutableListOf("","","")
  private val cursorAlphas= mutableMapOf<Int,Int>()
+ private var cursorAnimator:ValueAnimator?=null
  private val valueViews= mutableListOf<TextView>()
  private var formPopup:PopupWindow?=null
  private var spellSession:SpellCheckerSession?=null
@@ -192,12 +193,13 @@ class KeyFastImeService:InputMethodService() {
  private fun formFieldText(index:Int):CharSequence {
   val value=values[index]
   if(index!=formField)return value.ifBlank{"Toque aqui e digite no teclado"}
+  cursorAnimator?.cancel()
   val text=SpannableString(value+"│")
   val span=object:CharacterStyle(){
    override fun updateDrawState(tp:TextPaint){tp.alpha=cursorAlphas[index]?:255}
   }
   text.setSpan(span,value.length,value.length+1,Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
-  ValueAnimator.ofInt(255,35).apply{
+  cursorAnimator=ValueAnimator.ofInt(255,35).apply{
    duration=520;repeatCount=ValueAnimator.INFINITE;repeatMode=ValueAnimator.REVERSE
    addUpdateListener{cursorAlphas[index]=it.animatedValue as Int;valueViews.getOrNull(index)?.invalidate()}
    start()
