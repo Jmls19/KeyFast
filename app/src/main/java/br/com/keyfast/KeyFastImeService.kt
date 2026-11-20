@@ -259,9 +259,32 @@ class KeyFastImeService:InputMethodService() {
   if(formMode){
    values[formField]+=s;updateForm();updateShiftAfterCharacter(s);return
   }
+  if(s==" "){insertSpaceWithAutoCorrection();return}
   currentInputConnection?.commitText(s,1)
   updateShiftAfterCharacter(s)
   refreshFromCursor()
+ }
+
+ private fun insertSpaceWithAutoCorrection(){
+  val ic=currentInputConnection?:return
+  val before=ic.getTextBeforeCursor(64,0)?.toString().orEmpty()
+  val token=before.takeLastWhile{!it.isWhitespace()}
+  val correction=if(token.isNotBlank() && token==requestedToken && shownSuggestions.isNotEmpty()){
+   applyWordCase(shownSuggestions.first(),token)
+  }else null
+  if(correction!=null && correction.isNotBlank() && !correction.equals(token,true)){
+   ic.deleteSurroundingText(token.length,0)
+   ic.commitText(correction+" ",1)
+  }else ic.commitText(" ",1)
+  refreshFromCursor()
+ }
+
+ private fun applyWordCase(candidate:String,original:String):String{
+  return when{
+   original.isNotEmpty() && original==original.uppercase(Locale("pt","BR")) -> candidate.uppercase(Locale("pt","BR"))
+   original.firstOrNull()?.isUpperCase()==true -> candidate.replaceFirstChar{it.uppercase(Locale("pt","BR"))}
+   else -> candidate.lowercase(Locale("pt","BR"))
+  }
  }
  private fun backspace(){
   if(formMode){if(values[formField].isNotEmpty())values[formField]=values[formField].dropLast(1);updateForm();return}
@@ -294,7 +317,7 @@ class KeyFastImeService:InputMethodService() {
  private fun refreshFromCursor(){
   if(formMode||!::suggestions.isInitialized)return
   val before=currentInputConnection?.getTextBeforeCursor(64,0)?.toString().orEmpty()
-  val token=before.takeLastWhile{!it.isWhitespace()}.uppercase()
+  val token=before.takeLastWhile{!it.isWhitespace()}
   refreshSuggestions(token)
  }
  private fun refreshSuggestions(token:String){
@@ -314,7 +337,7 @@ class KeyFastImeService:InputMethodService() {
   ensureSpellChecker()
   renderWordSuggestions(token,shownSuggestions)
   spellRequestToken=token
-  runCatching{spellSession?.getSuggestions(TextInfo(token.lowercase()),4,false)}
+  runCatching{spellSession?.getSuggestions(TextInfo(token),4,false)}
  }
  private fun renderWordSuggestions(token:String,words:List<String>){
   if(formMode||token!=requestedToken)return
