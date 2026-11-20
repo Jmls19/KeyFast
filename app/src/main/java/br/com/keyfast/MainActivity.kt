@@ -14,15 +14,17 @@ class MainActivity:Activity() {
  private lateinit var store:ShortcutStore
  private lateinit var list:LinearLayout
  private val bg=Color.rgb(16,24,39); private val cyan=Color.rgb(32,199,217)
+ private val interRegular by lazy { Typeface.createFromAsset(assets,"fonts/Inter-Regular.ttf") }
+ private val interBold by lazy { Typeface.createFromAsset(assets,"fonts/Inter-Bold.ttf") }
  override fun onCreate(savedInstanceState:Bundle?) { super.onCreate(savedInstanceState); store=ShortcutStore(this); render() }
  private fun render() {
   val root=LinearLayout(this).apply { orientation=LinearLayout.VERTICAL; setPadding(22,24,22,18); setBackgroundColor(bg) }
   val brand=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL;gravity=android.view.Gravity.CENTER_VERTICAL}
   brand.addView(ImageView(this).apply{setImageResource(R.drawable.keyfast_logo);contentDescription="Logotipo KeyFast"},LinearLayout.LayoutParams(58,58))
-  brand.addView(TextView(this).apply { text="KeyFast"; textSize=30f; setTextColor(Color.WHITE); typeface=Typeface.create("sans-serif",Typeface.BOLD); setPadding(12,0,0,0) })
+  brand.addView(TextView(this).apply { text="KeyFast"; textSize=30f; setTextColor(Color.WHITE); typeface=interBold; setPadding(12,0,0,0) })
   root.addView(brand)
 
-  root.addView(TextView(this).apply { text="Digite menos. Resolva mais."; textSize=14f; setTextColor(cyan); typeface=Typeface.create("sans-serif",Typeface.NORMAL); setPadding(0,2,0,18) })
+  root.addView(TextView(this).apply { text="Digite menos. Resolva mais."; textSize=14f; setTextColor(cyan); typeface=interRegular; setPadding(0,2,0,18) })
   root.addView(Button(this).apply { text="ATIVAR TECLADO"; setOnClickListener { startActivity(Intent(Settings.ACTION_INPUT_METHOD_SETTINGS)) } })
   root.addView(Button(this).apply { text="TESTAR / SELECIONAR TECLADO"; setOnClickListener { (getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager).showInputMethodPicker() } })
   root.addView(Button(this).apply { text="+ NOVO ATALHO"; setOnClickListener { edit(null) } })
