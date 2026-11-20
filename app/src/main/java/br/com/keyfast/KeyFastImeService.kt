@@ -153,9 +153,10 @@ class KeyFastImeService:InputMethodService() {
    val value=TextView(this).apply{
     text=formFieldText(i)
     textSize=14f;setTextColor(Color.WHITE);typeface=interRegular;gravity=Gravity.CENTER_VERTICAL;maxLines=1
-    ellipsize=android.text.TextUtils.TruncateAt.END
+    isSingleLine=true;setHorizontallyScrolling(true);ellipsize=null
    }
    valueViews.add(value);card.addView(value,LinearLayout.LayoutParams(-1,dp(29)))
+   value.post{scrollFormValueToEnd(value)}
    outer.addView(card,LinearLayout.LayoutParams(-1,dp(57)).apply{setMargins(0,dp(3),0,dp(3))})
   }
   val actions=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.END}
@@ -214,6 +215,15 @@ class KeyFastImeService:InputMethodService() {
   valueViews.forEachIndexed{i,v->
    v.text=formFieldText(i)
    (v.parent as? View)?.background=keyBg(if(i==formField)Color.rgb(35,91,105)else Color.rgb(38,52,73))
+   v.post{scrollFormValueToEnd(v)}
+  }
+ }
+ private fun scrollFormValueToEnd(view:TextView){
+  val textLayout=view.layout?:return
+  if(textLayout.lineCount>0){
+   val right=textLayout.getLineRight(0)
+   val visibleWidth=(view.width-view.paddingLeft-view.paddingRight).coerceAtLeast(0)
+   view.scrollTo((right-visibleWidth).toInt().coerceAtLeast(0),0)
   }
  }
  private fun closeForm(){
@@ -234,7 +244,9 @@ class KeyFastImeService:InputMethodService() {
   val fan=FrameLayout(this).apply{clipChildren=false;clipToPadding=false}
   val labels=listOf("NOVO","EDITAR","EXCLUIR")
   val colors=listOf(cyan,Color.rgb(29,137,166),Color.rgb(38,52,73))
-  val positions=listOf(Triple(6,4,0),Triple(6,56,1),Triple(6,108,2))
+  // Leque em arco: os botões sobem e se afastam para a esquerda a partir da engrenagem.
+  // Cada destino tem uma altura e um recuo próprios; não formam uma fileira nem uma coluna.
+  val positions=listOf(Triple(8,4,0),Triple(68,55,1),Triple(128,106,2))
   lateinit var popup:PopupWindow
   positions.forEachIndexed{index,pos->
    val button=TextView(this).apply{
@@ -249,7 +261,7 @@ class KeyFastImeService:InputMethodService() {
      when(index){0->showForm(null);1->showList(true);else->showList(false)}
     }
    }
-   val size=dp(66)
+   val size=dp(76)
    val lp=FrameLayout.LayoutParams(size,dp(42),Gravity.TOP or Gravity.LEFT).apply{
     leftMargin=dp(pos.first);topMargin=dp(pos.second)
    }
@@ -272,7 +284,7 @@ class KeyFastImeService:InputMethodService() {
   for(i in 0 until fan.childCount){
    val child=fan.getChildAt(i)
    child.translationX=width.toFloat()
-   child.translationY=0f
+   child.translationY=dp(12).toFloat()
    child.animate().alpha(1f).scaleX(1f).scaleY(1f).translationX(0f).translationY(0f)
     .setStartDelay((i*55).toLong()).setDuration(260).setInterpolator(DecelerateInterpolator()).start()
   }
