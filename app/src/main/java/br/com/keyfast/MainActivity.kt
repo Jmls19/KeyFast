@@ -8,6 +8,7 @@ import android.os.Bundle
 import android.provider.Settings
 import android.view.inputmethod.InputMethodManager
 import android.widget.*
+import android.graphics.drawable.GradientDrawable
 
 class MainActivity:Activity() {
  private lateinit var store:ShortcutStore
@@ -16,12 +17,16 @@ class MainActivity:Activity() {
  override fun onCreate(savedInstanceState:Bundle?) { super.onCreate(savedInstanceState); store=ShortcutStore(this); render() }
  private fun render() {
   val root=LinearLayout(this).apply { orientation=LinearLayout.VERTICAL; setPadding(22,24,22,18); setBackgroundColor(bg) }
-  root.addView(TextView(this).apply { text="KeyFast"; textSize=30f; setTextColor(Color.WHITE); typeface=Typeface.DEFAULT_BOLD })
-  root.addView(TextView(this).apply { text="Digite menos. Resolva mais."; textSize=14f; setTextColor(cyan); setPadding(0,2,0,18) })
+  val brand=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL;gravity=android.view.Gravity.CENTER_VERTICAL}
+  brand.addView(ImageView(this).apply{setImageResource(R.drawable.keyfast_logo);contentDescription="Logotipo KeyFast"},LinearLayout.LayoutParams(58,58))
+  brand.addView(TextView(this).apply { text="KeyFast"; textSize=30f; setTextColor(Color.WHITE); typeface=Typeface.create("sans-serif",Typeface.BOLD); setPadding(12,0,0,0) })
+  root.addView(brand)
+
+  root.addView(TextView(this).apply { text="Digite menos. Resolva mais."; textSize=14f; setTextColor(cyan); typeface=Typeface.create("sans-serif",Typeface.NORMAL); setPadding(0,2,0,18) })
   root.addView(Button(this).apply { text="ATIVAR TECLADO"; setOnClickListener { startActivity(Intent(Settings.ACTION_INPUT_METHOD_SETTINGS)) } })
   root.addView(Button(this).apply { text="TESTAR / SELECIONAR TECLADO"; setOnClickListener { (getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager).showInputMethodPicker() } })
   root.addView(Button(this).apply { text="+ NOVO ATALHO"; setOnClickListener { edit(null) } })
-  root.addView(TextView(this).apply { text="SEUS ATALHOS"; textSize=13f; typeface=Typeface.DEFAULT_BOLD; setTextColor(cyan); setPadding(0,18,0,8) })
+  root.addView(TextView(this).apply { text="SEUS ATALHOS"; textSize=13f; typeface=Typeface.create("sans-serif",Typeface.BOLD); setTextColor(cyan); setPadding(0,18,0,8) })
   val scroll=ScrollView(this); list=LinearLayout(this).apply { orientation=LinearLayout.VERTICAL }; scroll.addView(list); root.addView(scroll,LinearLayout.LayoutParams(-1,0,1f))
   setContentView(root); refresh()
  }
