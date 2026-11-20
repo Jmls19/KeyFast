@@ -194,14 +194,18 @@ class KeyFastImeService:InputMethodService() {
   val value=values[index]
   if(index!=formField)return value.ifBlank{"Toque aqui e digite no teclado"}
   cursorAnimator?.cancel()
-  val text=SpannableString(value+"│")
+  // O caractere invisível mantém espaços finais visíveis no layout; o traço
+  // continua imediatamente depois do último caractere digitado (inclusive espaço/ponto).
+  val display=value+"\u200B│"
+  val text=SpannableString(display)
   val span=object:CharacterStyle(){
    override fun updateDrawState(tp:TextPaint){tp.alpha=cursorAlphas[index]?:255}
   }
-  text.setSpan(span,value.length,value.length+1,Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+  text.setSpan(span,display.length-1,display.length,Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+  cursorAnimator?.cancel()
   cursorAnimator=ValueAnimator.ofInt(255,35).apply{
    duration=520;repeatCount=ValueAnimator.INFINITE;repeatMode=ValueAnimator.REVERSE
-   addUpdateListener{cursorAlphas[index]=it.animatedValue as Int;valueViews.getOrNull(index)?.invalidate()}
+   addUpdateListener{cursorAlphas[index]=it.animatedValue as Int;valueViews.getOrNull(index)?.postInvalidateOnAnimation()}
    start()
   }
   return text
@@ -226,11 +230,11 @@ class KeyFastImeService:InputMethodService() {
  }
 
  private fun showManageMenu(anchor:View){
-  val width=dp(190);val height=dp(166)
+  val width=dp(214);val height=dp(154)
   val fan=FrameLayout(this).apply{clipChildren=false;clipToPadding=false}
   val labels=listOf("NOVO","EDITAR","EXCLUIR")
   val colors=listOf(cyan,Color.rgb(29,137,166),Color.rgb(38,52,73))
-  val positions=listOf(Triple(8,4,0),Triple(62,54,1),Triple(116,104,2))
+  val positions=listOf(Triple(6,4,0),Triple(6,56,1),Triple(6,108,2))
   lateinit var popup:PopupWindow
   positions.forEachIndexed{index,pos->
    val button=TextView(this).apply{
@@ -260,17 +264,17 @@ class KeyFastImeService:InputMethodService() {
   // Offsets relativos à janela do IME; getLocationOnScreen deslocava o menu
   // para fora da área visível do teclado.
   val loc=IntArray(2);anchor.getLocationInWindow(loc)
+  // O painel fica imediatamente à esquerda da engrenagem; os três comandos
+  // atravessam visualmente a frente do ícone, deslizando da direita para a esquerda.
   val x=(loc[0]+anchor.width-width).coerceAtLeast(dp(4))
-  val y=(loc[1]-height+dp(8)).coerceAtLeast(dp(4))
+  val y=(loc[1]+(anchor.height-height)/2).coerceAtLeast(dp(4))
   popup.showAtLocation(root,Gravity.TOP or Gravity.LEFT,x,y)
   for(i in 0 until fan.childCount){
    val child=fan.getChildAt(i)
-   val lp=child.layoutParams as FrameLayout.LayoutParams
-   val dx=dp(176)-lp.leftMargin-dp(33)
-   val dy=dp(154)-lp.topMargin
-   child.translationX=dx.toFloat();child.translationY=dy.toFloat()
+   child.translationX=width.toFloat()
+   child.translationY=0f
    child.animate().alpha(1f).scaleX(1f).scaleY(1f).translationX(0f).translationY(0f)
-    .setStartDelay((i*45).toLong()).setDuration(230).setInterpolator(DecelerateInterpolator()).start()
+    .setStartDelay((i*55).toLong()).setDuration(260).setInterpolator(DecelerateInterpolator()).start()
   }
  }
  private fun showList(edit:Boolean){
