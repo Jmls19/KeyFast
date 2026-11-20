@@ -197,7 +197,7 @@ class KeyFastImeService:InputMethodService() {
   cursorAnimator?.cancel()
   // O caractere invisível mantém espaços finais visíveis no layout; o traço
   // continua imediatamente depois do último caractere digitado (inclusive espaço/ponto).
-  val display=value+"\u200B│"
+  val display=value+"│"
   val text=SpannableString(display)
   val span=object:CharacterStyle(){
    override fun updateDrawState(tp:TextPaint){tp.alpha=cursorAlphas[index]?:255}
@@ -246,7 +246,7 @@ class KeyFastImeService:InputMethodService() {
   val colors=listOf(cyan,Color.rgb(29,137,166),Color.rgb(38,52,73))
   // Leque em arco: os botões sobem e se afastam para a esquerda a partir da engrenagem.
   // Cada destino tem uma altura e um recuo próprios; não formam uma fileira nem uma coluna.
-  val positions=listOf(Triple(8,4,0),Triple(68,55,1),Triple(128,106,2))
+  val positions=listOf(Triple(128,4,0),Triple(68,54,1),Triple(8,104,2))
   lateinit var popup:PopupWindow
   positions.forEachIndexed{index,pos->
    val button=TextView(this).apply{
