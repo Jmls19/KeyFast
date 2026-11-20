@@ -234,9 +234,10 @@ class KeyFastImeService:InputMethodService() {
    elevation=dp(12).toFloat();setClippingEnabled(false)
    setOnDismissListener{fan.animate().alpha(0f).setDuration(90).start()}
   }
-  val loc=IntArray(2);anchor.getLocationOnScreen(loc)
-  val screenW=resources.displayMetrics.widthPixels
-  val x=(screenW-loc[0]-anchor.width).coerceAtLeast(dp(4))
+  // Offsets relativos à janela do IME; getLocationOnScreen deslocava o menu
+  // para fora da área visível do teclado.
+  val loc=IntArray(2);anchor.getLocationInWindow(loc)
+  val x=(loc[0]+anchor.width-width).coerceAtLeast(dp(4))
   val y=(loc[1]+anchor.height-dp(5)).coerceAtLeast(dp(4))
   popup.showAtLocation(root,Gravity.TOP or Gravity.LEFT,x,y)
   for(i in 0 until fan.childCount){
@@ -299,8 +300,13 @@ class KeyFastImeService:InputMethodService() {
   choices.forEach{ch->val shown=if(caps)ch.uppercase()else ch;box.addView(TextView(this).apply{
    text=shown;textSize=22f;gravity=Gravity.CENTER;typeface=interMedium;setTextColor(Color.WHITE);background=keyBg(cyan);isClickable=true;setOnClickListener{type(shown);popup.dismiss()}
   },LinearLayout.LayoutParams(dp(48),dp(52)).apply{setMargins(dp(2),0,dp(2),0)})}
-  popup=PopupWindow(box,ViewGroup.LayoutParams.WRAP_CONTENT,ViewGroup.LayoutParams.WRAP_CONTENT,true);popup.isOutsideTouchable=true
-  popup.setBackgroundDrawable(GradientDrawable().apply{setColor(Color.TRANSPARENT)});popup.elevation=dp(8).toFloat()
+  popup=PopupWindow(box,ViewGroup.LayoutParams.WRAP_CONTENT,ViewGroup.LayoutParams.WRAP_CONTENT,false).apply{
+   isFocusable=false
+   isOutsideTouchable=true
+   setBackgroundDrawable(GradientDrawable().apply{setColor(Color.TRANSPARENT)})
+   elevation=dp(8).toFloat()
+  }
+  // Mantém o foco no editor/IME ao escolher um caractere acentuado.
   popup.showAtLocation(root,Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL,0,dp(190))
  }
  private fun keyBg(color:Int)=GradientDrawable().apply{setColor(color);cornerRadius=dp(8).toFloat()}
@@ -382,6 +388,22 @@ class KeyFastImeService:InputMethodService() {
    },true)
   }
  }
+ override fun onStartInput(attribute:EditorInfo?,restarting:Boolean){
+  super.onStartInput(attribute,restarting)
+  requestedToken=""
+  spellRequestToken=""
+  shownSuggestions=emptyList()
+  ensureSpellChecker()
+ }
+
+ override fun onUpdateSelection(oldSelStart:Int,oldSelEnd:Int,newSelStart:Int,newSelEnd:Int,
+  candidatesStart:Int,candidatesEnd:Int){
+  super.onUpdateSelection(oldSelStart,oldSelEnd,newSelStart,newSelEnd,candidatesStart,candidatesEnd)
+  if(!formMode && ::suggestions.isInitialized){
+   Handler(Looper.getMainLooper()).post{if(!formMode)refreshFromCursor()}
+  }
+ }
+
  private fun refreshFromCursor(){
   if(formMode||!::suggestions.isInitialized)return
   val before=currentInputConnection?.getTextBeforeCursor(64,0)?.toString().orEmpty()
