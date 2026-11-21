@@ -30,6 +30,12 @@ import java.util.Locale
 class KeyFastImeService:InputMethodService() {
  private lateinit var root:LinearLayout
  private lateinit var suggestions:LinearLayout
+ private lateinit var pasteButton:TextView
+ private var clipboardManager:android.content.ClipboardManager?=null
+ private var hasEditorCursor=false
+ private val clipboardListener=android.content.ClipboardManager.OnPrimaryClipChangedListener{
+  Handler(Looper.getMainLooper()).post{updatePasteVisibility()}
+ }
  private lateinit var store:ShortcutStore
  private var caps=false
  private var capsLock=false
@@ -73,13 +79,16 @@ class KeyFastImeService:InputMethodService() {
   val bar=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER_VERTICAL;setPadding(dp(5),0,dp(2),dp(4))}
   suggestions=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER_VERTICAL}
   bar.addView(suggestions,LinearLayout.LayoutParams(0,-1,1f))
-  val paste=TextView(this).apply{
+  pasteButton=TextView(this).apply{
    text="📋";textSize=21f;gravity=Gravity.CENTER;setTextColor(cyan);typeface=interMedium
    background=keyBg(Color.rgb(35,91,105));isClickable=true;setPadding(dp(3),0,dp(3),0)
    contentDescription="Colar texto da área de transferência"
+   visibility=View.GONE
    setOnClickListener{pasteFromClipboard()}
   }
-  bar.addView(paste,LinearLayout.LayoutParams(dp(38),dp(34)).apply{setMargins(0,0,dp(4),0)})
+  bar.addView(pasteButton,LinearLayout.LayoutParams(dp(38),dp(34)).apply{setMargins(0,0,dp(4),0)})
+  clipboardManager=getSystemService(CLIPBOARD_SERVICE) as? android.content.ClipboardManager
+  clipboardManager?.addPrimaryClipChangedListener(clipboardListener)
   val manage=TextView(this).apply{
    text="⚙️";textSize=24f;gravity=Gravity.CENTER;setTextColor(cyan);typeface=interMedium
    background=keyBg(Color.rgb(35,91,105));isClickable=true;setPadding(dp(5),0,dp(5),0)
@@ -93,6 +102,8 @@ class KeyFastImeService:InputMethodService() {
  override fun onDestroy(){
   spellSession?.close(); spellSession=null
   formPopup?.dismiss(); formPopup=null
+  clipboardManager?.removePrimaryClipChangedListener(clipboardListener)
+  clipboardManager=null
   super.onDestroy()
  }
 
@@ -403,6 +414,14 @@ class KeyFastImeService:InputMethodService() {
   row.addView(key,LinearLayout.LayoutParams(0,-1,weight).apply{setMargins(dp(3),dp(3),dp(3),dp(3))})
  }
 
+ private fun updatePasteVisibility(){
+  if(!::pasteButton.isInitialized)return
+  val clip=clipboardManager?.primaryClip
+  val hasText=clipboardManager?.hasPrimaryClip()==true && clip!=null && clip.itemCount>0 &&
+   runCatching{clip.getItemAt(0).coerceToText(this)?.isNotEmpty()==true}.getOrDefault(false)
+  pasteButton.visibility=if(hasText && hasEditorCursor && !formMode)View.VISIBLE else View.GONE
+ }
+
  private fun pasteFromClipboard(){
   val clipboard=getSystemService(CLIPBOARD_SERVICE) as? android.content.ClipboardManager
   val clip=clipboard?.primaryClip
@@ -525,12 +544,16 @@ class KeyFastImeService:InputMethodService() {
   requestedToken=""
   spellRequestToken=""
   shownSuggestions=emptyList()
+  hasEditorCursor=false
+  updatePasteVisibility()
   ensureSpellChecker()
  }
 
  override fun onUpdateSelection(oldSelStart:Int,oldSelEnd:Int,newSelStart:Int,newSelEnd:Int,
   candidatesStart:Int,candidatesEnd:Int){
   super.onUpdateSelection(oldSelStart,oldSelEnd,newSelStart,newSelEnd,candidatesStart,candidatesEnd)
+  hasEditorCursor=newSelStart>=0 && newSelEnd>=0
+  updatePasteVisibility()
   if(!formMode && ::suggestions.isInitialized){
    Handler(Looper.getMainLooper()).post{if(!formMode)refreshFromCursor()}
   }
