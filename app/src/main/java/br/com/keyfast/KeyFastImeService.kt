@@ -73,6 +73,13 @@ class KeyFastImeService:InputMethodService() {
   val bar=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER_VERTICAL;setPadding(dp(5),0,dp(2),dp(4))}
   suggestions=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER_VERTICAL}
   bar.addView(suggestions,LinearLayout.LayoutParams(0,-1,1f))
+  val paste=TextView(this).apply{
+   text="📋";textSize=21f;gravity=Gravity.CENTER;setTextColor(cyan);typeface=interMedium
+   background=keyBg(Color.rgb(35,91,105));isClickable=true;setPadding(dp(3),0,dp(3),0)
+   contentDescription="Colar texto da área de transferência"
+   setOnClickListener{pasteFromClipboard()}
+  }
+  bar.addView(paste,LinearLayout.LayoutParams(dp(38),dp(34)).apply{setMargins(0,0,dp(4),0)})
   val manage=TextView(this).apply{
    text="⚙️";textSize=24f;gravity=Gravity.CENTER;setTextColor(cyan);typeface=interMedium
    background=keyBg(Color.rgb(35,91,105));isClickable=true;setPadding(dp(5),0,dp(5),0)
@@ -394,6 +401,27 @@ class KeyFastImeService:InputMethodService() {
    if(label=="—")contentDescription="Espaço"
   }
   row.addView(key,LinearLayout.LayoutParams(0,-1,weight).apply{setMargins(dp(3),dp(3),dp(3),dp(3))})
+ }
+
+ private fun pasteFromClipboard(){
+  val clipboard=getSystemService(CLIPBOARD_SERVICE) as? android.content.ClipboardManager
+  val clip=clipboard?.primaryClip
+  if(clip==null || clip.itemCount==0){
+   Toast.makeText(this,"A área de transferência está vazia.",Toast.LENGTH_SHORT).show()
+   return
+  }
+  val pasted=runCatching{clip.getItemAt(0).coerceToText(this)?.toString().orEmpty()}.getOrDefault("")
+  if(pasted.isEmpty()){
+   Toast.makeText(this,"Não há texto disponível para colar.",Toast.LENGTH_SHORT).show()
+   return
+  }
+  if(formMode){
+   values[formField]+=pasted
+   updateForm()
+  }else{
+   currentInputConnection?.commitText(pasted,1)
+   refreshFromCursor()
+  }
  }
 
  private fun type(s:String){
