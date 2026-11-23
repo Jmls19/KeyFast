@@ -90,7 +90,7 @@ class KeyFastImeService:InputMethodService() {
   clipboardManager=getSystemService(CLIPBOARD_SERVICE) as? android.content.ClipboardManager
   clipboardManager?.addPrimaryClipChangedListener(clipboardListener)
   val manage=TextView(this).apply{
-   text="⚙️";textSize=24f;gravity=Gravity.CENTER;setTextColor(cyan);typeface=interMedium
+   text="⚙️";textSize=24f;gravity=Gravity.CENTER;setTextColor(Color.WHITE);typeface=interMedium
    background=keyBg(Color.rgb(18,99,217));isClickable=true;setPadding(dp(5),0,dp(5),0)
    contentDescription="Gerenciar atalhos";setOnClickListener{showManageMenu(this)}
   }
@@ -309,7 +309,7 @@ class KeyFastImeService:InputMethodService() {
   box.addView(TextView(this).apply{text=if(edit)"SELECIONE PARA EDITAR"else"SELECIONE PARA EXCLUIR";textSize=11f;typeface=interMedium;setTextColor(cyan);setPadding(dp(8),dp(7),dp(8),dp(7))})
   lateinit var popup:PopupWindow
   items.forEach{item->box.addView(TextView(this).apply{
-   text=item.trigger+"  •  "+item.recipientName;textSize=13f;typeface=interRegular;setTextColor(Color.WHITE);gravity=Gravity.CENTER_VERTICAL;setPadding(dp(10),0,dp(10),0);isClickable=true
+   text=item.trigger+"  •  "+item.recipientName;textSize=13f;typeface=interRegular;setTextColor(Color.rgb(12,31,65));gravity=Gravity.CENTER_VERTICAL;setPadding(dp(10),0,dp(10),0);isClickable=true
    setBackgroundResource(android.R.drawable.list_selector_background)
    setOnClickListener{popup.dismiss();if(edit)showForm(item)else confirmDelete(item)}
   },LinearLayout.LayoutParams(dp(260),dp(42)))}
@@ -319,7 +319,7 @@ class KeyFastImeService:InputMethodService() {
  }
  private fun confirmDelete(item:RecipientShortcut){
   val box=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setPadding(dp(14),dp(12),dp(14),dp(10));background=keyBg(Color.rgb(250,252,255))}
-  box.addView(TextView(this).apply{text="Excluir o atalho "+item.trigger+"?";textSize=14f;typeface=interRegular;setTextColor(Color.WHITE)})
+  box.addView(TextView(this).apply{text="Excluir o atalho "+item.trigger+"?";textSize=14f;typeface=interRegular;setTextColor(Color.rgb(12,31,65))})
   val buttons=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.END}
   lateinit var popup:PopupWindow
   buttons.addView(actionText("CANCELAR",specialColor){popup.dismiss()},LinearLayout.LayoutParams(dp(92),dp(34)).apply{setMargins(0,dp(12),dp(6),0)})
@@ -361,7 +361,7 @@ class KeyFastImeService:InputMethodService() {
   // Mantém o foco no editor/IME ao escolher um caractere acentuado.
   popup.showAtLocation(root,Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL,0,dp(190))
  }
- private fun keyBg(color:Int)=GradientDrawable().apply{setColor(color);cornerRadius=dp(11).toFloat()}
+ private fun keyBg(color:Int)=GradientDrawable().apply{setColor(color);cornerRadius=dp(12).toFloat();if(color==Color.rgb(250,252,255))setStroke(dp(1),Color.rgb(218,230,249))}
  private fun addKey(row:LinearLayout,label:String,weight:Float,color:Int,longPress:(()->Unit)?=null,action:()->Unit){
   val key=TextView(this).apply{
    text=label;textSize=if(label=="—")22f else 19f;gravity=Gravity.CENTER;setTextColor(if(color==keyColor||color==specialColor)Color.rgb(12,31,65) else Color.WHITE);typeface=interMedium
@@ -573,7 +573,7 @@ class KeyFastImeService:InputMethodService() {
   if(match!=null){
    requestedToken=token;shownSuggestions=emptyList()
    suggestions.addView(TextView(this).apply{
-    text=match.trigger+"   ›   "+match.recipientName;textSize=14f;gravity=Gravity.CENTER_VERTICAL;setTextColor(Color.WHITE)
+    text=match.trigger+"   ›   "+match.recipientName;textSize=14f;gravity=Gravity.CENTER_VERTICAL;setTextColor(Color.rgb(12,31,65))
     setPadding(dp(13),0,dp(13),0);background=keyBg(Color.rgb(225,237,255));isClickable=true;setOnClickListener{expand(match)}
    },LinearLayout.LayoutParams(-1,-1))
    return
@@ -590,7 +590,7 @@ class KeyFastImeService:InputMethodService() {
   suggestions.removeAllViews()
   words.forEach{word->
    val item=TextView(this).apply{
-    text=word;textSize=14f;gravity=Gravity.CENTER;setTextColor(Color.WHITE)
+    text=word;textSize=14f;gravity=Gravity.CENTER;setTextColor(Color.rgb(12,31,65))
     setPadding(dp(10),0,dp(10),0);background=keyBg(Color.rgb(225,237,255));isClickable=true
     setOnClickListener{
      val ic=currentInputConnection?:return@setOnClickListener
