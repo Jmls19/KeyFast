@@ -87,7 +87,7 @@ class RouteManagerActivity:Activity() {
                 view.setTextColor(ink);view.textSize=14f;view.setPadding(dp(10),dp(9),dp(10),dp(9))
                 return view
             }
-            override fun getDropDownView(position:Int,convertView:View?,parent:ViewGroup?):View {
+            override fun getDropDownView(position:Int,convertView:View?,parent:ViewGroup):View {
                 val view=super.getDropDownView(position,convertView,parent) as TextView
                 view.setTextColor(ink);view.textSize=14f;view.setPadding(dp(14),dp(12),dp(14),dp(12))
                 view.setBackgroundColor(Color.rgb(250,252,255))
@@ -256,7 +256,7 @@ class RouteManagerActivity:Activity() {
         val hasHeader=header.contains("logradouro",true)||header.contains("trecho",true)||header.contains("cep",true)
         val newFormat=header.contains("cep",true)
         lines.drop(if(hasHeader)1 else 0).forEachIndexed{idx,line->
-            val p=line.split(';',',','\\t').map{it.trim().trim('"')}
+            val p=line.split(';',',','\t').map{it.trim().trim('"')}
             val cep:String
             val segment:Int
             val street:String
