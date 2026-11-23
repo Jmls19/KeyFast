@@ -70,12 +70,22 @@ class RouteManagerActivity:Activity() {
         raw.lineSequence().map{it.trim()}.filter{it.isNotBlank()}.forEachIndexed{idx,line->
             val p=line.split(';',',','\t').map{it.trim().trim('"')}
             if(idx==0&&p.any{it.contains("logradouro",true)||it.contains("trecho",true)})return@forEachIndexed
-            require(p.size>=3) 
-            val street=p[0];val start=p[1].toInt();val end=p[2].toInt()
-            val direction=p.getOrNull(3)?.uppercase()?:if(end>=start)"CRESCENTE" else "DECRESCENTE"
+            val segment:Int
+            val street:String
+            val start:Int
+            val end:Int
+            val direction:String
+            if(p.size>=5) {
+                segment=p[0].toIntOrNull()?:idx+1
+                street=p[1];start=p[2].toInt();end=p[3].toInt();direction=p[4].uppercase()
+            } else {
+                require(p.size>=3)
+                segment=idx+1;street=p[0];start=p[1].toInt();end=p[2].toInt()
+                direction=p.getOrNull(3)?.uppercase()?:if(end>=start)"CRESCENTE" else "DECRESCENTE"
+            }
             val step=if(end>=start)1 else -1
             var n=start
-            while(true){result.add(RouteAddress(street=street,number=n.toString(),segment=idx+1,direction=direction));if(n==end)break;n+=step}
+            while(true){result.add(RouteAddress(street=street,number=n.toString(),segment=segment,direction=direction));if(n==end)break;n+=step}
         }
         return result
     }
@@ -101,7 +111,8 @@ class RouteManagerActivity:Activity() {
             saveFile->runCatching{
                 val route=exporting?:return
                 contentResolver.openOutputStream(uri)!!.bufferedWriter().use{it.write(store.exportJson(route))}
-                Toast.makeText(this,"Arquivo pronto para compartilhar pelo WhatsApp ou outro app.",Toast.LENGTH_LONG).show()
+                val share=Intent(Intent.ACTION_SEND).apply{type="application/json";putExtra(Intent.EXTRA_STREAM,uri);addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)}
+                startActivity(Intent.createChooser(share,"Compartilhar roteiro KeyFast"))
             }.onFailure{Toast.makeText(this,"Falha ao exportar roteiro.",Toast.LENGTH_LONG).show()}
         }
     }
