@@ -27,6 +27,7 @@ class MainActivity:Activity() {
   root.addView(TextView(this).apply { text="Digite menos. Resolva mais."; textSize=14f; setTextColor(cyan); typeface=interRegular; setPadding(0,2,0,18) })
   root.addView(Button(this).apply { text="ATIVAR TECLADO"; setOnClickListener { startActivity(Intent(Settings.ACTION_INPUT_METHOD_SETTINGS)) } })
   root.addView(Button(this).apply { text="TESTAR / SELECIONAR TECLADO"; setOnClickListener { (getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager).showInputMethodPicker() } })
+  root.addView(Button(this).apply { text="📋 MEUS ROTEIROS"; setOnClickListener { startActivity(Intent(this@MainActivity,RouteManagerActivity::class.java)) } })
   root.addView(Button(this).apply { text="+ NOVO ATALHO"; setOnClickListener { edit(null) } })
   root.addView(TextView(this).apply { text="SEUS ATALHOS"; textSize=13f; typeface=Typeface.create("sans-serif",Typeface.BOLD); setTextColor(cyan); setPadding(0,18,0,8) })
   val scroll=ScrollView(this); list=LinearLayout(this).apply { orientation=LinearLayout.VERTICAL }; scroll.addView(list); root.addView(scroll,LinearLayout.LayoutParams(-1,0,1f))
