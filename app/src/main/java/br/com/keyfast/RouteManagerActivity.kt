@@ -84,9 +84,11 @@ class RouteManagerActivity:Activity() {
                 segment=idx+1;street=p[0];start=p[1].toInt();end=p[2].toInt()
                 direction=p.getOrNull(3)?.uppercase()?:if(end>=start)"CRESCENTE" else "DECRESCENTE"
             }
-            val step=if(end>=start)1 else -1
-            var n=start
-            while(true){result.add(RouteAddress(street=street,number=n.toString(),segment=segment,direction=direction));if(n==end)break;n+=step}
+            val descending=direction.contains("DECRESC",true) || (p.size<4&&end<start)
+            val step=if(descending)-1 else 1
+            var n=if(descending)maxOf(start,end) else minOf(start,end)
+            val last=if(descending)minOf(start,end) else maxOf(start,end)
+            while(true){result.add(RouteAddress(street=street,number=n.toString(),segment=segment,direction=if(descending)"DECRESCENTE" else "CRESCENTE"));if(n==last)break;n+=step}
         }
         return result
     }
