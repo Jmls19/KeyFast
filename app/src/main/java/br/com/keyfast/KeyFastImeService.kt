@@ -203,11 +203,11 @@ class KeyFastImeService:InputMethodService() {
  }
 
  private fun formIconButton(icon:String,description:String,color:Int,action:()->Unit)=TextView(this).apply{
-  text=icon;textSize=22f;gravity=Gravity.CENTER;typeface=interMedium;setTextColor(Color.WHITE);background=keyBg(color)
+  text=icon;textSize=22f;gravity=Gravity.CENTER;typeface=interMedium;setTextColor(if(color==specialColor)Color.rgb(12,31,65) else Color.WHITE);background=keyBg(color)
   isClickable=true;isFocusable=false;contentDescription=description;setOnClickListener{action()}
  }
  private fun actionText(label:String,color:Int,action:()->Unit)=TextView(this).apply{
-  text=label;textSize=11f;gravity=Gravity.CENTER;typeface=interMedium;setTextColor(Color.WHITE);background=keyBg(color);isClickable=true;setOnClickListener{action()}
+  text=label;textSize=11f;gravity=Gravity.CENTER;typeface=interMedium;setTextColor(if(color==specialColor)Color.rgb(12,31,65) else Color.WHITE);background=keyBg(color);isClickable=true;setOnClickListener{action()}
  }
  private fun formFieldText(index:Int):CharSequence {
   val value=values[index]
