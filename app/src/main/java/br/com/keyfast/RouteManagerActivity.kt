@@ -7,8 +7,9 @@ import android.net.Uri
 import android.os.Bundle
 import android.view.Gravity
 import android.widget.*
-import java.io.BufferedReader
-import java.io.InputStreamReader
+import android.util.Xml
+import java.io.ByteArrayInputStream
+import java.util.zip.ZipInputStream
 
 class RouteManagerActivity:Activity() {
     private lateinit var store:RouteStore
@@ -89,6 +90,52 @@ class RouteManagerActivity:Activity() {
         }
         return result
     }
+    private fun parseXlsx(bytes:ByteArray):String {
+        val files=mutableMapOf<String,ByteArray>()
+        ZipInputStream(ByteArrayInputStream(bytes)).use { zip ->
+            while(true){val entry=zip.nextEntry?:break;files[entry.name]=zip.readBytes();zip.closeEntry()}
+        }
+        val shared=mutableListOf<String>()
+        files["xl/sharedStrings.xml"]?.let { xml ->
+            val p=Xml.newPullParser();p.setInput(ByteArrayInputStream(xml),"UTF-8")
+            var inSi=false;var inText=false;val value=StringBuilder()
+            while(p.eventType!=org.xmlpull.v1.XmlPullParser.END_DOCUMENT){
+                when(p.eventType){
+                    org.xmlpull.v1.XmlPullParser.START_TAG->{if(p.name=="si"){inSi=true;value.setLength(0)};if(p.name=="t"&&inSi)inText=true}
+                    org.xmlpull.v1.XmlPullParser.TEXT->{if(inText)value.append(p.text)}
+                    org.xmlpull.v1.XmlPullParser.END_TAG->{if(p.name=="t")inText=false;if(p.name=="si"){shared.add(value.toString());inSi=false}}
+                };p.next()
+            }
+        }
+        val sheet=files["xl/worksheets/sheet1.xml"]?:throw IllegalArgumentException("Planilha sem primeira aba.")
+        val p=Xml.newPullParser();p.setInput(ByteArrayInputStream(sheet),"UTF-8")
+        val rows=mutableListOf<Map<Int,String>>();var row=mutableMapOf<Int,String>()
+        var inCell=false;var inValue=false;var cellType="";var cellRef="";val value=StringBuilder()
+        while(p.eventType!=org.xmlpull.v1.XmlPullParser.END_DOCUMENT){
+            when(p.eventType){
+                org.xmlpull.v1.XmlPullParser.START_TAG->when(p.name){
+                    "row"->{row=mutableMapOf()}
+                    "c"->{inCell=true;cellRef=p.getAttributeValue(null,"r")?:"";cellType=p.getAttributeValue(null,"t")?:"";value.setLength(0)}
+                    "v"->{if(inCell)inValue=true}
+                    "t"->{if(inCell&&cellType=="inlineStr")inValue=true}
+                }
+                org.xmlpull.v1.XmlPullParser.TEXT->{if(inCell&&inValue)value.append(p.text)}
+                org.xmlpull.v1.XmlPullParser.END_TAG->when(p.name){
+                    "v","t"->{inValue=false}
+                    "c"->{
+                        var col=0
+                        cellRef.takeWhile{it.isLetter()}.uppercase().forEach{col=col*26+(it-'A'+1)}
+                        val raw=value.toString()
+                        val resolved=if(cellType=="s")shared.getOrNull(raw.toIntOrNull()?:-1)?:raw else raw
+                        if(col>0)row[col-1]=resolved
+                        inCell=false;inValue=false
+                    }
+                    "row"->{if(row.isNotEmpty())rows.add(row)}
+                }
+            };p.next()
+        }
+        return rows.joinToString("\n"){r->(0..(r.keys.maxOrNull()?:0)).joinToString(";"){i->r[i].orEmpty().replace(";"," ")}}
+    }
     private fun exportRoute(route:RouteDefinition) {
         exporting=route
         val i=Intent(Intent.ACTION_CREATE_DOCUMENT).apply{addCategory(Intent.CATEGORY_OPENABLE);type="application/json";putExtra(Intent.EXTRA_TITLE,route.name.replace(Regex("[^A-Za-z0-9_-]"),"_")+".keyfast")}
@@ -99,10 +146,10 @@ class RouteManagerActivity:Activity() {
         val uri=data.data!!
         when(requestCode){
             openFile->runCatching{
-                val raw=contentResolver.openInputStream(uri)!!.bufferedReader().use{it.readText()}
+                val bytes=contentResolver.openInputStream(uri)!!.use{it.readBytes()}
+                val raw=if(bytes.size>=2&&bytes[0]==0x50.toByte()&&bytes[1]==0x4b.toByte())parseXlsx(bytes) else String(bytes,Charsets.UTF_8)
                 if(raw.trimStart().startsWith("{"))store.importJson(raw)
                 else {
-                    val lines=raw.lines()
                     val title=uri.lastPathSegment?.substringAfterLast(':')?.substringAfterLast('/')?.substringBeforeLast('.')?.ifBlank{"Roteiro importado"}?:"Roteiro importado"
                     store.save(RouteDefinition(name=title,addresses=parseCsv(raw)))
                 }
