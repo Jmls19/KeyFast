@@ -25,7 +25,8 @@ class RouteManagerActivity:Activity() {
     private val pale=Color.rgb(225,237,255)
     private val ink=Color.rgb(12,31,65)
     private fun surface(color:Int)=GradientDrawable().apply{setColor(color);cornerRadius=dp(15).toFloat();setStroke(dp(1),Color.rgb(205,222,249))}
-    private fun action(label:String,primary:Boolean,onClick:()->Unit)=TextView(this).apply{text=label;gravity=Gravity.CENTER;textSize=12f;typeface=Typeface.create("sans-serif-medium",Typeface.NORMAL);setTextColor(if(primary)Color.WHITE else ink);background=surface(if(primary)blue else pale);isClickable=true;isFocusable=true;setPadding(dp(8),dp(10),dp(8),dp(10));setOnClickListener{onClick()}}\n    private fun styleDialog(dialog:AlertDialog){dialog.window?.setBackgroundDrawable(surface(Color.rgb(250,252,255)));dialog.getButton(AlertDialog.BUTTON_POSITIVE)?.setTextColor(blue);dialog.getButton(AlertDialog.BUTTON_NEGATIVE)?.setTextColor(ink)}
+    private fun action(label:String,primary:Boolean,onClick:()->Unit)=TextView(this).apply{text=label;gravity=Gravity.CENTER;textSize=12f;typeface=Typeface.create("sans-serif-medium",Typeface.NORMAL);setTextColor(if(primary)Color.WHITE else ink);background=surface(if(primary)blue else pale);isClickable=true;isFocusable=true;setPadding(dp(8),dp(10),dp(8),dp(10));setOnClickListener{onClick()}}
+    private fun styleDialog(dialog:AlertDialog){dialog.window?.setBackgroundDrawable(surface(Color.rgb(250,252,255)));dialog.getButton(AlertDialog.BUTTON_POSITIVE)?.setTextColor(blue);dialog.getButton(AlertDialog.BUTTON_NEGATIVE)?.setTextColor(ink)}
     override fun onCreate(savedInstanceState:Bundle?) { super.onCreate(savedInstanceState);store=RouteStore(this);render() }
     private fun dp(v:Int)=(v*resources.displayMetrics.density+0.5f).toInt()
     private fun render() {
