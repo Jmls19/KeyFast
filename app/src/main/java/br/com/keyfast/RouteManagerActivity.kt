@@ -25,7 +25,7 @@ class RouteManagerActivity:Activity() {
     private val pale=Color.rgb(225,237,255)
     private val ink=Color.rgb(12,31,65)
     private fun surface(color:Int)=GradientDrawable().apply{setColor(color);cornerRadius=dp(15).toFloat();setStroke(dp(1),Color.rgb(205,222,249))}
-    private fun action(label:String,primary:Boolean,onClick:()->Unit)=TextView(this).apply{text=label;gravity=Gravity.CENTER;textSize=12f;typeface=Typeface.create("sans-serif-medium",Typeface.NORMAL);setTextColor(if(primary)Color.WHITE else ink);background=surface(if(primary)blue else pale);isClickable=true;isFocusable=true;setPadding(dp(8),dp(10),dp(8),dp(10));setOnClickListener{onClick()}}
+    private fun action(label:String,primary:Boolean,onClick:()->Unit)=TextView(this).apply{text=label;gravity=Gravity.CENTER;textSize=12f;typeface=Typeface.create("sans-serif-medium",Typeface.NORMAL);setTextColor(if(primary)Color.WHITE else ink);background=surface(if(primary)blue else pale);isClickable=true;isFocusable=true;setPadding(dp(8),dp(10),dp(8),dp(10));setOnClickListener{onClick()}}\n    private fun styleDialog(dialog:AlertDialog){dialog.window?.setBackgroundDrawable(surface(Color.rgb(250,252,255)));dialog.getButton(AlertDialog.BUTTON_POSITIVE)?.setTextColor(blue);dialog.getButton(AlertDialog.BUTTON_NEGATIVE)?.setTextColor(ink)}
     override fun onCreate(savedInstanceState:Bundle?) { super.onCreate(savedInstanceState);store=RouteStore(this);render() }
     private fun dp(v:Int)=(v*resources.displayMetrics.density+0.5f).toInt()
     private fun render() {
@@ -41,17 +41,17 @@ class RouteManagerActivity:Activity() {
     private fun refresh() {
         list.removeAllViews()
         store.routes().forEach { route ->
-            val card=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setPadding(dp(12),dp(10),dp(12),dp(10));background=surface(Color.rgb(250,252,255));elevation=dp(3).toFloat()}
+            val card=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setPadding(dp(14),dp(12),dp(14),dp(12));background=surface(Color.rgb(250,252,255));elevation=dp(3).toFloat()}
             card.addView(TextView(this).apply{text=route.name;textSize=18f;setTextColor(ink)})
             card.addView(TextView(this).apply{text="${route.addresses.size} endereços • ${route.addresses.count{it.delivered}} entregues";textSize=12f;setTextColor(Color.rgb(92,110,138))})
             val actions=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL}
-            actions.addView(Button(this).apply{text="ABRIR";setOnClickListener{startRoute(route)}})
-            actions.addView(Button(this).apply{text="EDITAR";setOnClickListener{editRoute(route)}})
-            actions.addView(Button(this).apply{text="COMPARTILHAR";setOnClickListener{exportRoute(route)}})
-            actions.addView(Button(this).apply{text="EXCLUIR";setOnClickListener{AlertDialog.Builder(this@RouteManagerActivity).setMessage("Excluir ${route.name}?").setNegativeButton("Cancelar",null).setPositiveButton("Excluir"){_,_->store.delete(route.id);refresh()}.show()}})
+            actions.addView(action("ABRIR",true){startRoute(route)})
+            actions.addView(action("EDITAR",false){editRoute(route)})
+            actions.addView(action("COMPARTILHAR",false){exportRoute(route)})
+            actions.addView(action("EXCLUIR",false){AlertDialog.Builder(this@RouteManagerActivity).setTitle("Excluir roteiro?").setMessage("Excluir ${route.name}?").setNegativeButton("CANCELAR",null).setPositiveButton("EXCLUIR"){_,_->store.delete(route.id);refresh()}.show().also{styleDialog(it)}})
             card.addView(actions);list.addView(card,LinearLayout.LayoutParams(-1,-2).apply{bottomMargin=dp(10)})
         }
-        if(store.routes().isEmpty())list.addView(TextView(this).apply{text="Nenhum roteiro cadastrado.";setTextColor(0xffcbd5e1.toInt());setPadding(0,dp(20),0,0)})
+        if(store.routes().isEmpty())list.addView(TextView(this).apply{text="Nenhum roteiro cadastrado.";setTextColor(Color.rgb(220,232,250));setPadding(0,dp(20),0,0)})
     }
     private fun startRoute(route:RouteDefinition) {
         store.setActive(route.id)
@@ -83,7 +83,7 @@ class RouteManagerActivity:Activity() {
         val card=LinearLayout(this).apply {
             orientation=LinearLayout.VERTICAL
             setPadding(dp(10),dp(8),dp(10),dp(10))
-            setBackgroundColor(0xff263449.toInt())
+            background=surface(Color.rgb(250,252,255))
         }
         val heading=TextView(this).apply {
             text="TRECHO ${container.childCount+1}"
@@ -106,7 +106,7 @@ class RouteManagerActivity:Activity() {
         numbers.addView(initial,LinearLayout.LayoutParams(0,-2,1f).apply{rightMargin=dp(5)})
         numbers.addView(final,LinearLayout.LayoutParams(0,-2,1f).apply{leftMargin=dp(5)})
         card.addView(numbers)
-        val directionLabel=TextView(this).apply{text="Sentido";textSize=12f;setTextColor(0xffcbd5e1.toInt());setPadding(dp(2),dp(4),0,0)}
+        val directionLabel=TextView(this).apply{text="Sentido";textSize=12f;setTextColor(ink);setPadding(dp(2),dp(4),0,0)}
         card.addView(directionLabel)
         card.addView(direction,LinearLayout.LayoutParams(-1,-2))
         container.addView(card,LinearLayout.LayoutParams(-1,-2).apply{bottomMargin=dp(10)})
@@ -123,7 +123,7 @@ class RouteManagerActivity:Activity() {
             orientation=LinearLayout.VERTICAL
             setPadding(dp(8),0,dp(8),0)
             addView(name)
-            addView(TextView(this@RouteManagerActivity).apply{text="Dados de cada trecho";textSize=14f;setTextColor(-1);setPadding(0,dp(8),0,dp(6))})
+            addView(TextView(this@RouteManagerActivity).apply{text="Dados de cada trecho";textSize=14f;setTextColor(ink);setPadding(0,dp(8),0,dp(6))})
             addView(segments)
             addView(add)
         }
