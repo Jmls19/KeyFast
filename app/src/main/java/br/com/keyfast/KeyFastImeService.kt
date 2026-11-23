@@ -80,7 +80,7 @@ class KeyFastImeService:InputMethodService() {
   suggestions=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER_VERTICAL}
   bar.addView(suggestions,LinearLayout.LayoutParams(0,-1,1f))
   pasteButton=TextView(this).apply{
-   text="📋";textSize=21f;gravity=Gravity.CENTER;setTextColor(cyan);typeface=interMedium
+   text="📋";textSize=21f;gravity=Gravity.CENTER;setTextColor(Color.WHITE);typeface=interMedium
    background=keyBg(Color.rgb(18,99,217));isClickable=true;setPadding(dp(3),0,dp(3),0)
    contentDescription="Colar texto da área de transferência"
    visibility=View.GONE
@@ -90,7 +90,7 @@ class KeyFastImeService:InputMethodService() {
   clipboardManager=getSystemService(CLIPBOARD_SERVICE) as? android.content.ClipboardManager
   clipboardManager?.addPrimaryClipChangedListener(clipboardListener)
   val manage=TextView(this).apply{
-   text="⚙️";textSize=24f;gravity=Gravity.CENTER;setTextColor(cyan);typeface=interMedium
+   text="⚙️";textSize=24f;gravity=Gravity.CENTER;setTextColor(Color.WHITE);typeface=interMedium
    background=keyBg(Color.rgb(18,99,217));isClickable=true;setPadding(dp(5),0,dp(5),0)
    contentDescription="Gerenciar atalhos";setOnClickListener{showManageMenu(this)}
   }
@@ -164,7 +164,7 @@ class KeyFastImeService:InputMethodService() {
   for(i in 0..2){
    val card=LinearLayout(this).apply{
     orientation=LinearLayout.VERTICAL;setPadding(dp(10),dp(6),dp(10),dp(6))
-    background=keyBg(if(i==formField)Color.rgb(18,99,217)else Color.rgb(250,252,255))
+    background=keyBg(if(i==formField)Color.rgb(225,237,255)else Color.rgb(250,252,255))
     isClickable=true;setOnClickListener{formField=i;updateForm()}
    }
    card.addView(TextView(this).apply{text=labels[i];textSize=10f;typeface=interMedium;setTextColor(cyan)})
@@ -232,7 +232,7 @@ class KeyFastImeService:InputMethodService() {
  private fun updateForm(){
   valueViews.forEachIndexed{i,v->
    v.text=formFieldText(i)
-   (v.parent as? View)?.background=keyBg(if(i==formField)Color.rgb(18,99,217)else Color.rgb(250,252,255))
+   (v.parent as? View)?.background=keyBg(if(i==formField)Color.rgb(225,237,255)else Color.rgb(250,252,255))
    v.post{scrollFormValueToEnd(v)}
   }
  }
@@ -286,7 +286,7 @@ class KeyFastImeService:InputMethodService() {
   addMenuButton("✕",Color.rgb(125,55,60),30){}
   addMenuButton("NOVO",cyan,54){showForm(null)}
   addMenuButton("ALTERAR",Color.rgb(28,111,226),68){showList(true)}
-  addMenuButton("EXCLUIR",Color.rgb(250,252,255),64){showList(false)}
+  addMenuButton("EXCLUIR",Color.rgb(170,65,65),64){showList(false)}
   popup=PopupWindow(row,width,height,false).apply{
    isOutsideTouchable=true;isFocusable=false
    setBackgroundDrawable(keyBg(Color.TRANSPARENT))
