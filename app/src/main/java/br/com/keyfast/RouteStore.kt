@@ -78,7 +78,7 @@ class RouteStore(context:android.content.Context) {
     }
     fun exportJson(route:RouteDefinition):String {
         val a=JSONArray()
-        route.addresses.forEach { x -> a.put(JSONObject().put("street",x.street).put("number",x.number).put("segment",x.segment).put("direction",x.direction).put("cep",x.cep)) }
+        route.addresses.forEach { x -> a.put(JSONObject().put("street",x.street).put("number",x.number).put("segment",x.segment).put("direction",x.direction).put("cep",x.cep).put("objectCode",x.objectCode).put("order",x.order)) }
         val rules=JSONArray()
         rules().filter{rule->route.addresses.any{it.street.equals(rule.street,true)}}.forEach{rules.put(JSONObject().put("street",it.street).put("number",it.number).put("low",it.lowAnchor).put("high",it.highAnchor))}
         return JSONObject().put("format","keyfast-route").put("version",1).put("name",route.name).put("addresses",a).put("numberRules",rules).toString(2)
