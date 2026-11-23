@@ -203,7 +203,7 @@ class RouteManagerActivity:Activity() {
             val match=Regex("^(.*?)(?:\\s+(\\d+[A-Za-z]?))$").matchEntire(fullAddress)
             val street=match?.groupValues?.get(1)?.trim().orEmpty().ifBlank{fullAddress}
             val house=match?.groupValues?.get(2).orEmpty()
-            result.add(RouteAddress(street=street,number=house,segment=1,direction="LISTA SRO",cep=cep,objectCode=code,order=order))
+            result.add(RouteAddress(street=street,number=house,segment=1,direction="LISTA SRO",cep=cep,objectCode=code))
         }
         return result.sortedBy{it.order}
     }
