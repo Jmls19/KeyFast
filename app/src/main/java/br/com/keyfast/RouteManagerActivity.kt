@@ -7,6 +7,9 @@ import android.net.Uri
 import android.os.Bundle
 import android.view.Gravity
 import android.widget.*
+import android.graphics.Color
+import android.graphics.Typeface
+import android.graphics.drawable.GradientDrawable
 import android.util.Xml
 import java.io.ByteArrayInputStream
 import java.util.zip.ZipInputStream
@@ -17,23 +20,30 @@ class RouteManagerActivity:Activity() {
     private val openFile=4101
     private val saveFile=4102
     private var exporting:RouteDefinition?=null
+    private val navy=Color.rgb(7,23,50)
+    private val blue=Color.rgb(18,99,217)
+    private val pale=Color.rgb(225,237,255)
+    private val ink=Color.rgb(12,31,65)
+    private fun surface(color:Int)=GradientDrawable().apply{setColor(color);cornerRadius=dp(15).toFloat();setStroke(dp(1),Color.rgb(205,222,249))}
+    private fun action(label:String,primary:Boolean,onClick:()->Unit)=TextView(this).apply{text=label;gravity=Gravity.CENTER;textSize=12f;typeface=Typeface.create("sans-serif-medium",Typeface.NORMAL);setTextColor(if(primary)Color.WHITE else ink);background=surface(if(primary)blue else pale);isClickable=true;isFocusable=true;setPadding(dp(8),dp(10),dp(8),dp(10));setOnClickListener{onClick()}}
     override fun onCreate(savedInstanceState:Bundle?) { super.onCreate(savedInstanceState);store=RouteStore(this);render() }
     private fun dp(v:Int)=(v*resources.displayMetrics.density+0.5f).toInt()
     private fun render() {
-        val root=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setPadding(dp(16),dp(18),dp(16),dp(16));setBackgroundColor(0xff101827.toInt())}
-        root.addView(TextView(this).apply{text="ROTEIROS";textSize=24f;setTextColor(-1);setPadding(0,0,0,dp(12))})
-        root.addView(Button(this).apply{text="IMPORTAR ROTEIRO POR ARQUIVO";setOnClickListener{val i=Intent(Intent.ACTION_OPEN_DOCUMENT).apply{addCategory(Intent.CATEGORY_OPENABLE);type="*/*";putExtra(Intent.EXTRA_MIME_TYPES,arrayOf("text/csv","text/plain","application/json","application/octet-stream"))};startActivityForResult(i,openFile)}})
-        root.addView(Button(this).apply{text="IMPORTAR LISTA DE ENTREGAS (SRO)";setOnClickListener{pasteDeliveryList()}})
-        root.addView(Button(this).apply{text="+ CRIAR ROTEIRO";setOnClickListener{editRoute(null)}})
+        window.statusBarColor=navy;window.navigationBarColor=navy
+        val root=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setPadding(dp(18),dp(20),dp(18),dp(16));background=GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,intArrayOf(navy,Color.rgb(5,17,39)))}
+        root.addView(TextView(this).apply{text="ROTEIROS";textSize=25f;typeface=Typeface.create("sans-serif-medium",Typeface.NORMAL);setTextColor(Color.WHITE);setPadding(dp(2),0,0,dp(14))})
+        root.addView(action("▣  IMPORTAR ROTEIRO POR ARQUIVO",true){val i=Intent(Intent.ACTION_OPEN_DOCUMENT).apply{addCategory(Intent.CATEGORY_OPENABLE);type="*/*";putExtra(Intent.EXTRA_MIME_TYPES,arrayOf("text/csv","text/plain","application/json","application/octet-stream"))};startActivityForResult(i,openFile)},LinearLayout.LayoutParams(-1,dp(50)).apply{bottomMargin=dp(9)})
+        root.addView(action("☷  IMPORTAR LISTA DE ENTREGAS (SRO)",false){pasteDeliveryList()},LinearLayout.LayoutParams(-1,dp(50)).apply{bottomMargin=dp(9)})
+        root.addView(action("+  CRIAR ROTEIRO",true){editRoute(null)},LinearLayout.LayoutParams(-1,dp(50)).apply{bottomMargin=dp(16)})
         val scroll=ScrollView(this);list=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL};scroll.addView(list);root.addView(scroll,LinearLayout.LayoutParams(-1,0,1f))
         setContentView(root);refresh()
     }
     private fun refresh() {
         list.removeAllViews()
         store.routes().forEach { route ->
-            val card=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setPadding(dp(12),dp(10),dp(12),dp(10));setBackgroundColor(0xff263449.toInt())}
-            card.addView(TextView(this).apply{text=route.name;textSize=18f;setTextColor(-1)})
-            card.addView(TextView(this).apply{text="${route.addresses.size} endereços • ${route.addresses.count{it.delivered}} entregues";textSize=12f;setTextColor(0xffcbd5e1.toInt())})
+            val card=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setPadding(dp(12),dp(10),dp(12),dp(10));background=surface(Color.rgb(250,252,255));elevation=dp(3).toFloat()}
+            card.addView(TextView(this).apply{text=route.name;textSize=18f;setTextColor(ink)})
+            card.addView(TextView(this).apply{text="${route.addresses.size} endereços • ${route.addresses.count{it.delivered}} entregues";textSize=12f;setTextColor(Color.rgb(92,110,138))})
             val actions=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL}
             actions.addView(Button(this).apply{text="ABRIR";setOnClickListener{startRoute(route)}})
             actions.addView(Button(this).apply{text="EDITAR";setOnClickListener{editRoute(route)}})
@@ -63,7 +73,7 @@ class RouteManagerActivity:Activity() {
             textSize=14f
             setPadding(dp(10),dp(8),dp(10),dp(8))
             if(numeric) inputType=android.text.InputType.TYPE_CLASS_NUMBER
-            setBackgroundResource(android.R.drawable.edit_text)
+            setTextColor(ink);setHintTextColor(Color.rgb(125,140,164));background=surface(Color.rgb(250,252,255))
         }
 
     private fun addSegment(container:LinearLayout, existing:List<RouteAddress> = emptyList()):SegmentFields {
@@ -78,7 +88,7 @@ class RouteManagerActivity:Activity() {
         val heading=TextView(this).apply {
             text="TRECHO ${container.childCount+1}"
             textSize=12f
-            setTextColor(0xff80cbc4.toInt())
+            setTextColor(blue)
             setPadding(0,0,0,dp(4))
         }
         val cep=field("CEP",first?.cep.orEmpty())
@@ -108,7 +118,7 @@ class RouteManagerActivity:Activity() {
         val segments=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL}
         val grouped=existing?.addresses?.groupBy{it.segment}?.toSortedMap()?.values?.toList().orEmpty()
         if(grouped.isEmpty()) addSegment(segments) else grouped.forEach{addSegment(segments,it)}
-        val add=Button(this).apply{text="+ ADICIONAR TRECHO";setOnClickListener{addSegment(segments)}}
+        val add=action("+  ADICIONAR TRECHO",false){addSegment(segments)}
         val content=LinearLayout(this).apply{
             orientation=LinearLayout.VERTICAL
             setPadding(dp(8),0,dp(8),0)
