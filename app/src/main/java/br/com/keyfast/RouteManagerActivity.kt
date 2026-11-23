@@ -82,7 +82,7 @@ class RouteManagerActivity:Activity() {
     private fun choiceSpinner(options:List<String>, selected:String):Spinner {
         val spinner=Spinner(this)
         val adapter=object:ArrayAdapter<String>(this,android.R.layout.simple_spinner_item,options) {
-            override fun getView(position:Int,convertView:View?,parent:ViewGroup?):View {
+            override fun getView(position:Int,convertView:View?,parent:ViewGroup):View {
                 val view=super.getView(position,convertView,parent) as TextView
                 view.setTextColor(ink);view.textSize=14f;view.setPadding(dp(10),dp(9),dp(10),dp(9))
                 return view
