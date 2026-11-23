@@ -23,6 +23,7 @@ class RouteManagerActivity:Activity() {
         val root=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setPadding(dp(16),dp(18),dp(16),dp(16));setBackgroundColor(0xff101827.toInt())}
         root.addView(TextView(this).apply{text="ROTEIROS";textSize=24f;setTextColor(-1);setPadding(0,0,0,dp(12))})
         root.addView(Button(this).apply{text="IMPORTAR ROTEIRO POR ARQUIVO";setOnClickListener{val i=Intent(Intent.ACTION_OPEN_DOCUMENT).apply{addCategory(Intent.CATEGORY_OPENABLE);type="*/*";putExtra(Intent.EXTRA_MIME_TYPES,arrayOf("text/csv","text/plain","application/json","application/octet-stream"))};startActivityForResult(i,openFile)}})
+        root.addView(Button(this).apply{text="IMPORTAR LISTA DE ENTREGAS (SRO)";setOnClickListener{pasteDeliveryList()}})
         root.addView(Button(this).apply{text="+ CRIAR ROTEIRO";setOnClickListener{editRoute(null)}})
         val scroll=ScrollView(this);list=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL};scroll.addView(list);root.addView(scroll,LinearLayout.LayoutParams(-1,0,1f))
         setContentView(root);refresh()
@@ -162,6 +163,51 @@ class RouteManagerActivity:Activity() {
         }
     }
 
+    private fun pasteDeliveryList() {
+        val input=EditText(this).apply { hint="Cole aqui as linhas copiadas do SRO Web"; minLines=8; gravity=Gravity.TOP }
+        val scroll=ScrollView(this).apply{addView(input)}
+        AlertDialog.Builder(this).setTitle("Colar lista de entregas")
+            .setMessage("Cole as colunas Código, Ordem, Endereço e CEP. As demais serão ignoradas.")
+            .setView(scroll).setNegativeButton("Cancelar",null)
+            .setPositiveButton("Importar"){_,_->importDeliveryText(input.text.toString(),"Lista SRO")}
+            .show()
+    }
+    private fun isTrackingCode(value:String)=Regex("^[A-Z]{2}\\d{9}[A-Z]{2}$").matches(value.trim().uppercase())
+    private fun importDeliveryText(raw:String, suggestedName:String) {
+        runCatching {
+            val addresses=parseDeliveryList(raw)
+            require(addresses.isNotEmpty()) { "Nenhuma linha de entrega reconhecida." }
+            val name=EditText(this).apply{setText(suggestedName);hint="Nome do roteiro";setSingleLine()}
+            AlertDialog.Builder(this).setTitle("Nomear roteiro").setView(name)
+                .setNegativeButton("Cancelar",null)
+                .setPositiveButton("Salvar"){_,_->
+                    val title=name.text.toString().trim().ifBlank{suggestedName}
+                    store.save(RouteDefinition(name=title,addresses=addresses))
+                    refresh()
+                    Toast.makeText(this,"\${addresses.size} entregas importadas.",Toast.LENGTH_LONG).show()
+                }.show()
+        }.onFailure { Toast.makeText(this,it.message?: "Não foi possível reconhecer a lista.",Toast.LENGTH_LONG).show() }
+    }
+    private fun parseDeliveryList(raw:String):List<RouteAddress> {
+        val result=mutableListOf<RouteAddress>()
+        raw.lineSequence().forEach { line ->
+            if(line.isBlank()) return@forEach
+            val cells=(if(line.contains("\\t")) line.split("\\t") else line.split(";")).map{it.trim().trim('"')}
+            if(cells.size<4) return@forEach
+            val code=cells[0].uppercase()
+            if(!isTrackingCode(code)) return@forEach
+            val order=cells[1].toIntOrNull() ?: (result.size+1)
+            val fullAddress=cells[2]
+            val cep=cells.firstOrNull{Regex("\\d{5}-?\\d{3}").matches(it)}.orEmpty()
+            if(fullAddress.isBlank()) return@forEach
+            val match=Regex("^(.*?)(?:\\s+(\\d+[A-Za-z]?))$").matchEntire(fullAddress)
+            val street=match?.groupValues?.get(1)?.trim().orEmpty().ifBlank{fullAddress}
+            val house=match?.groupValues?.get(2).orEmpty()
+            result.add(RouteAddress(street=street,number=house,segment=1,direction="LISTA SRO",cep=cep,objectCode=code,order=order))
+        }
+        return result.sortedBy{it.order}
+    }
+
     private fun parseCsv(raw:String):List<RouteAddress> {
         val result=mutableListOf<RouteAddress>()
         val lines=raw.lineSequence().map{it.trim()}.filter{it.isNotBlank()}.toList()
@@ -264,7 +310,9 @@ class RouteManagerActivity:Activity() {
                 val bytes=contentResolver.openInputStream(uri)!!.use{it.readBytes()}
                 val raw=if(bytes.size>=2&&bytes[0]==0x50.toByte()&&bytes[1]==0x4b.toByte())parseXlsx(bytes) else String(bytes,Charsets.UTF_8)
                 if(raw.trimStart().startsWith("{"))store.importJson(raw)
-                else {
+                else if(raw.lineSequence().any{line->line.split("\t").firstOrNull()?.trim()?.let{isTrackingCode(it)}==true || line.split(";").firstOrNull()?.trim()?.let{isTrackingCode(it)}==true}) {
+                    importDeliveryText(raw,uri.lastPathSegment?.substringAfterLast(':')?.substringAfterLast('/')?.substringBeforeLast('.')?: "Lista SRO")
+                } else {
                     val title=uri.lastPathSegment?.substringAfterLast(':')?.substringAfterLast('/')?.substringBeforeLast('.')?.ifBlank{"Roteiro importado"}?:"Roteiro importado"
                     store.save(RouteDefinition(name=title,addresses=parseCsv(raw)))
                 }
