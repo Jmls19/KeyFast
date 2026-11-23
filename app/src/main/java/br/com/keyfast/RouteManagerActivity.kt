@@ -6,6 +6,8 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
 import android.view.Gravity
+import android.view.View
+import android.view.ViewGroup
 import android.widget.*
 import android.graphics.Color
 import android.graphics.Typeface
@@ -64,7 +66,7 @@ class RouteManagerActivity:Activity() {
         startService(Intent(this,RouteWidgetService::class.java).setAction(RouteWidgetService.ACTION_SHOW))
         finish()
     }
-    private data class SegmentFields(val cep:EditText,val street:EditText,val initial:EditText,val final:EditText,val direction:Spinner,val card:LinearLayout)
+    private data class SegmentFields(val cep:EditText,val street:EditText,val initial:EditText,val final:EditText,val direction:Spinner,val parity:Spinner,val card:LinearLayout)
 
     private fun field(label:String, value:String="", numeric:Boolean=false):EditText =
         EditText(this).apply {
@@ -76,6 +78,27 @@ class RouteManagerActivity:Activity() {
             if(numeric) inputType=android.text.InputType.TYPE_CLASS_NUMBER
             setTextColor(ink);setHintTextColor(Color.rgb(125,140,164));background=surface(Color.rgb(250,252,255))
         }
+
+    private fun choiceSpinner(options:List<String>, selected:String):Spinner {
+        val spinner=Spinner(this)
+        val adapter=object:ArrayAdapter<String>(this,android.R.layout.simple_spinner_item,options) {
+            override fun getView(position:Int,convertView:View?,parent:ViewGroup?):View {
+                val view=super.getView(position,convertView,parent) as TextView
+                view.setTextColor(ink);view.textSize=14f;view.setPadding(dp(10),dp(9),dp(10),dp(9))
+                return view
+            }
+            override fun getDropDownView(position:Int,convertView:View?,parent:ViewGroup?):View {
+                val view=super.getDropDownView(position,convertView,parent) as TextView
+                view.setTextColor(ink);view.textSize=14f;view.setPadding(dp(14),dp(12),dp(14),dp(12))
+                view.setBackgroundColor(Color.rgb(250,252,255))
+                return view
+            }
+        }
+        spinner.adapter=adapter
+        spinner.background=surface(pale)
+        spinner.setSelection(options.indexOf(selected).takeIf{it>=0}?:0)
+        return spinner
+    }
 
     private fun addSegment(container:LinearLayout, existing:List<RouteAddress> = emptyList()):SegmentFields {
         val first=existing.firstOrNull()
@@ -96,10 +119,9 @@ class RouteManagerActivity:Activity() {
         val street=field("Logradouro",first?.street.orEmpty())
         val initial=field("N. Inicial",if(nums.isEmpty())"" else if(descending)nums.max().toString() else nums.min().toString(),true)
         val final=field("N. Final",if(nums.isEmpty())"" else if(descending)nums.min().toString() else nums.max().toString(),true)
-        val direction=Spinner(this).apply {
-            adapter=ArrayAdapter(this@RouteManagerActivity,android.R.layout.simple_spinner_dropdown_item,listOf("Crescente","Decrescente"))
-            setSelection(if(descending)1 else 0)
-        }
+        val direction=choiceSpinner(listOf("Crescente","Decrescente"),if(descending)"Decrescente" else "Crescente")
+        val parityValue=first?.parity?.uppercase()?.takeIf{it in listOf("PARES","IMPARES","AMBOS")}?:"AMBOS"
+        val parity=choiceSpinner(listOf("Ambos","Pares","Ímpares"),when(parityValue){"PARES"->"Pares";"IMPARES"->"Ímpares";else->"Ambos"})
         card.addView(heading)
         card.addView(cep,LinearLayout.LayoutParams(-1,-2))
         card.addView(street,LinearLayout.LayoutParams(-1,-2))
@@ -110,8 +132,11 @@ class RouteManagerActivity:Activity() {
         val directionLabel=TextView(this).apply{text="Sentido";textSize=12f;setTextColor(ink);setPadding(dp(2),dp(4),0,0)}
         card.addView(directionLabel)
         card.addView(direction,LinearLayout.LayoutParams(-1,-2))
+        val parityLabel=TextView(this).apply{text="Numeração";textSize=12f;setTextColor(ink);setPadding(dp(2),dp(7),0,0)}
+        card.addView(parityLabel)
+        card.addView(parity,LinearLayout.LayoutParams(-1,-2))
         container.addView(card,LinearLayout.LayoutParams(-1,-2).apply{bottomMargin=dp(10)})
-        return SegmentFields(cep,street,initial,final,direction,card)
+        return SegmentFields(cep,street,initial,final,direction,parity,card)
     }
 
     private fun editRoute(existing:RouteDefinition?) {
@@ -143,15 +168,19 @@ class RouteManagerActivity:Activity() {
                         val last=s.final.text.toString().toInt()
                         val cepValue=s.cep.text.toString().trim()
                         require(street.isNotBlank() && first>=0 && last>=0)
-                        val descending=s.direction.selectedItemPosition==1
+                        val descending=s.direction.selectedItem?.toString()=="Decrescente"
+                        val parity=when(s.parity.selectedItem?.toString()){"Pares"->"PARES";"Ímpares"->"IMPARES";else->"AMBOS"}
                         val step=if(descending)-1 else 1
                         var n=if(descending)maxOf(first,last) else minOf(first,last)
                         val stop=if(descending)minOf(first,last) else maxOf(first,last)
+                        val before=parsed.size
                         while(true){
-                            parsed.add(RouteAddress(street=street,number=n.toString(),segment=idx+1,direction=if(descending)"DECRESCENTE" else "CRESCENTE",cep=cepValue))
+                            val selected=when(parity){"PARES"->n%2==0;"IMPARES"->n%2!=0;else->true}
+                            if(selected)parsed.add(RouteAddress(street=street,number=n.toString(),segment=idx+1,direction=if(descending)"DECRESCENTE" else "CRESCENTE",cep=cepValue,parity=parity))
                             if(n==stop)break
                             n+=step
                         }
+                        require(parsed.size>before){"O intervalo não contém números da paridade selecionada."}
                     }
                     require(parsed.isNotEmpty())
                     store.save(RouteDefinition(existing?.id?:java.util.UUID.randomUUID().toString(),name.text.toString().trim(),parsed))
@@ -255,7 +284,7 @@ class RouteManagerActivity:Activity() {
             var n=if(descending)maxOf(start,end) else minOf(start,end)
             val last=if(descending)minOf(start,end) else maxOf(start,end)
             while(true){
-                result.add(RouteAddress(street=street,number=n.toString(),segment=segment,direction=if(descending)"DECRESCENTE" else "CRESCENTE",cep=cep))
+                val selected=when(parity){"PARES"->n%2==0;"IMPARES"->n%2!=0;else->true}\n                if(selected)result.add(RouteAddress(street=street,number=n.toString(),segment=segment,direction=if(descending)"DECRESCENTE" else "CRESCENTE",cep=cep,parity=parity))
                 if(n==last)break
                 n+=step
             }
