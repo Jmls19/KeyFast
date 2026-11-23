@@ -176,7 +176,7 @@ class RouteManagerActivity:Activity() {
                         val before=parsed.size
                         while(true){
                             val selected=when(parity){"PARES"->n%2==0;"IMPARES"->n%2!=0;else->true}
-                            if(selected)parsed.add(RouteAddress(street=street,number=n.toString(),segment=idx+1,direction=if(descending)"DECRESCENTE" else "CRESCENTE",cep=cepValue,parity=parity))
+                            val savedRandomReference=store.rules().any{it.street.equals(street,true)&&it.number==n.toString()}\n                            if(selected||savedRandomReference)parsed.add(RouteAddress(street=street,number=n.toString(),segment=idx+1,direction=if(descending)"DECRESCENTE" else "CRESCENTE",cep=cepValue,parity=parity))
                             if(n==stop)break
                             n+=step
                         }
@@ -292,7 +292,7 @@ class RouteManagerActivity:Activity() {
             val before=result.size
             while(true) {
                 val selected=when(parity){"PARES"->n%2==0;"IMPARES"->n%2!=0;else->true}
-                if(selected)result.add(RouteAddress(street=street,number=n.toString(),segment=segment,direction=if(descending)"DECRESCENTE" else "CRESCENTE",cep=cep,parity=parity))
+                val savedRandomReference=store.rules().any{it.street.equals(street,true)&&it.number==n.toString()}\n                if(selected||savedRandomReference)result.add(RouteAddress(street=street,number=n.toString(),segment=segment,direction=if(descending)"DECRESCENTE" else "CRESCENTE",cep=cep,parity=parity))
                 if(n==last)break
                 n+=step
             }
