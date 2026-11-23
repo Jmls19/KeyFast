@@ -156,7 +156,7 @@ class RouteManagerActivity:Activity() {
                     store.save(RouteDefinition(existing?.id?:java.util.UUID.randomUUID().toString(),name.text.toString().trim(),parsed))
                     refresh()
                 }.onFailure{Toast.makeText(this,"Confira o nome e os campos dos trechos.",Toast.LENGTH_LONG).show()}
-            }.show()
+            }.show().also{styleDialog(it)}
     }
 
     private fun segmentsViews(container:LinearLayout):List<SegmentFields> {
@@ -180,7 +180,7 @@ class RouteManagerActivity:Activity() {
             .setMessage("Cole as colunas Código, Ordem, Endereço e CEP. As demais serão ignoradas.")
             .setView(scroll).setNegativeButton("Cancelar",null)
             .setPositiveButton("Importar"){_,_->importDeliveryText(input.text.toString(),"Lista SRO")}
-            .show()
+            .show().also{styleDialog(it)}
     }
     private fun isTrackingCode(value:String)=Regex("^[A-Z]{2}\\d{9}[A-Z]{2}$").matches(value.trim().uppercase())
     private fun importDeliveryText(raw:String, suggestedName:String) {
@@ -195,7 +195,7 @@ class RouteManagerActivity:Activity() {
                     store.save(RouteDefinition(name=title,addresses=addresses))
                     refresh()
                     Toast.makeText(this,"\${addresses.size} entregas importadas.",Toast.LENGTH_LONG).show()
-                }.show()
+                }.show().also{styleDialog(it)}
         }.onFailure { Toast.makeText(this,it.message?: "Não foi possível reconhecer a lista.",Toast.LENGTH_LONG).show() }
     }
     private fun parseDeliveryList(raw:String):List<RouteAddress> {
