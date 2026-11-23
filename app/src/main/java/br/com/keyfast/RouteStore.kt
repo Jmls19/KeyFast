@@ -77,7 +77,7 @@ class RouteStore(context:android.content.Context) {
     }
     fun exportJson(route:RouteDefinition):String {
         val a=JSONArray()
-        route.addresses.forEach { x -> a.put(JSONObject().put("street",x.street).put("number",x.number).put("segment",x.segment).put("direction",x.direction).put("cep",x.cep).put("objectCode",x.objectCode).put("order",x.order)) }
+        route.addresses.forEach { x -> a.put(JSONObject().put("street",x.street).put("number",x.number).put("segment",x.segment).put("direction",x.direction).put("cep",x.cep).put("objectCode",x.objectCode)) }
         val rules=JSONArray()
         rules().filter{rule->route.addresses.any{it.street.equals(rule.street,true)}}.forEach{rules.put(JSONObject().put("street",it.street).put("number",it.number).put("low",it.lowAnchor).put("high",it.highAnchor))}
         return JSONObject().put("format","keyfast-route").put("version",1).put("name",route.name).put("addresses",a).put("numberRules",rules).toString(2)
@@ -85,7 +85,7 @@ class RouteStore(context:android.content.Context) {
     fun importJson(raw:String):RouteDefinition {
         val o=JSONObject(raw); require(o.getString("format")=="keyfast-route"&&o.getInt("version")==1)
         val a=o.getJSONArray("addresses")
-        val addresses=(0 until a.length()).map{i->val x=a.getJSONObject(i);RouteAddress(street=x.getString("street"),number=x.getString("number"),segment=x.optInt("segment",1),direction=x.optString("direction","CRESCENTE"),cep=x.optString("cep",""),objectCode=x.optString("objectCode",""),order=x.optInt("order",0))}
+        val addresses=(0 until a.length()).map{i->val x=a.getJSONObject(i);RouteAddress(street=x.getString("street"),number=x.getString("number"),segment=x.optInt("segment",1),direction=x.optString("direction","CRESCENTE"),cep=x.optString("cep",""),objectCode=x.optString("objectCode",""))}
         val route=RouteDefinition(name=o.getString("name"),addresses=addresses)
         val rr=o.optJSONArray("numberRules")?:JSONArray()
         for(i in 0 until rr.length()){val x=rr.getJSONObject(i);saveRule(NumberRule(x.getString("street"),x.getString("number"),x.getString("low"),x.getString("high")))}
