@@ -189,7 +189,7 @@ class RouteManagerActivity:Activity() {
         }.onFailure { Toast.makeText(this,it.message?: "Não foi possível reconhecer a lista.",Toast.LENGTH_LONG).show() }
     }
     private fun parseDeliveryList(raw:String):List<RouteAddress> {
-        val result=mutableListOf<RouteAddress>()
+        val result=mutableListOf<Pair<Int,RouteAddress>>()
         raw.lineSequence().forEach { line ->
             if(line.isBlank()) return@forEach
             val cells=(if(line.contains("\t")) line.split("\t") else line.split(";")).map{it.trim().trim('"')}
@@ -203,9 +203,9 @@ class RouteManagerActivity:Activity() {
             val match=Regex("^(.*?)(?:\\s+(\\d+[A-Za-z]?))$").matchEntire(fullAddress)
             val street=match?.groupValues?.get(1)?.trim().orEmpty().ifBlank{fullAddress}
             val house=match?.groupValues?.get(2).orEmpty()
-            result.add(RouteAddress(street=street,number=house,segment=1,direction="LISTA SRO",cep=cep,objectCode=code))
+            result.add(order to RouteAddress(street=street,number=house,segment=1,direction="LISTA SRO",cep=cep,objectCode=code))
         }
-        return result.sortedBy{it.order}
+        return result.sortedBy{it.first}.map{it.second}
     }
 
     private fun parseCsv(raw:String):List<RouteAddress> {
@@ -215,7 +215,7 @@ class RouteManagerActivity:Activity() {
         val hasHeader=header.contains("logradouro",true)||header.contains("trecho",true)||header.contains("cep",true)
         val newFormat=header.contains("cep",true)
         lines.drop(if(hasHeader)1 else 0).forEachIndexed{idx,line->
-            val p=line.split(';',',','\\t').map{it.trim().trim('"')}
+            val p=line.split(';',',','\t').map{it.trim().trim('"')}
             val cep:String
             val segment:Int
             val street:String
