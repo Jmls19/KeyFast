@@ -93,8 +93,8 @@ class RouteWidgetService:Service() {
     private fun showFullList(){
         hide();showingList=true
         val route=activeRoute()?:return
-        val root=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setPadding(dp(10),dp(8),dp(10),dp(8));background=bg(Color.rgb(16,24,39))}
-        val header=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER_VERTICAL}
+        val root=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setPadding(dp(10),dp(8),dp(10),dp(8));background=bg(Color.rgb(250,252,255))}
+        val header=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER_VERTICAL;setPadding(dp(8),dp(7),dp(4),dp(7));background=bg(blue)}
         header.addView(TextView(this).apply{text="LISTA COMPLETA • ${route.name}";textSize=13f;setTextColor(Color.WHITE);setTypeface(null,1)},LinearLayout.LayoutParams(0,-2,1f))
         header.addView(iconButton("↩","Voltar ao widget"){showWidget()})
         header.addView(iconButton("✕","Fechar widget"){hide();stopSelf()})
