@@ -199,7 +199,8 @@ class RouteManagerActivity:Activity() {
             val initial=numbers.getChildAt(0) as? EditText ?: return@mapNotNull null
             val final=numbers.getChildAt(1) as? EditText ?: return@mapNotNull null
             val direction=card.getChildAt(5) as? Spinner ?: return@mapNotNull null
-            SegmentFields(cep,street,initial,final,direction,card)
+            val parity=card.getChildAt(7) as? Spinner ?: return@mapNotNull null
+            SegmentFields(cep,street,initial,final,direction,parity,card)
         }
     }
 
@@ -255,7 +256,7 @@ class RouteManagerActivity:Activity() {
         val hasHeader=header.contains("logradouro",true)||header.contains("trecho",true)||header.contains("cep",true)
         val newFormat=header.contains("cep",true)
         lines.drop(if(hasHeader)1 else 0).forEachIndexed{idx,line->
-            val p=line.split(';',',','\t').map{it.trim().trim('"')}
+            val p=line.split(';',',','\\t').map{it.trim().trim('"')}
             val cep:String
             val segment:Int
             val street:String
@@ -279,15 +280,23 @@ class RouteManagerActivity:Activity() {
                 segment=idx+1;street=p[0];start=p[1].toInt();end=p[2].toInt()
                 direction=p.getOrNull(3)?.uppercase()?:if(end>=start)"CRESCENTE" else "DECRESCENTE"
             }
+            val parity=when(p.getOrNull(5)?.uppercase()) {
+                "PAR","PARES","EVEN"->"PARES"
+                "IMPAR","ÍMPAR","IMPARES","ÍMPARES","ODD"->"IMPARES"
+                else->"AMBOS"
+            }
             val descending=direction.contains("DECRESC",true) || (p.size<4&&end<start)
             val step=if(descending)-1 else 1
             var n=if(descending)maxOf(start,end) else minOf(start,end)
             val last=if(descending)minOf(start,end) else maxOf(start,end)
-            while(true){
-                val selected=when(parity){"PARES"->n%2==0;"IMPARES"->n%2!=0;else->true}\n                if(selected)result.add(RouteAddress(street=street,number=n.toString(),segment=segment,direction=if(descending)"DECRESCENTE" else "CRESCENTE",cep=cep,parity=parity))
+            val before=result.size
+            while(true) {
+                val selected=when(parity){"PARES"->n%2==0;"IMPARES"->n%2!=0;else->true}
+                if(selected)result.add(RouteAddress(street=street,number=n.toString(),segment=segment,direction=if(descending)"DECRESCENTE" else "CRESCENTE",cep=cep,parity=parity))
                 if(n==last)break
                 n+=step
             }
+            require(result.size>before){"O intervalo não contém números da paridade selecionada."}
         }
         return result
     }
