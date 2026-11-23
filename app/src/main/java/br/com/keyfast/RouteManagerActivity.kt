@@ -52,35 +52,144 @@ class RouteManagerActivity:Activity() {
         startService(Intent(this,RouteWidgetService::class.java).setAction(RouteWidgetService.ACTION_SHOW))
         finish()
     }
-    private fun editRoute(existing:RouteDefinition?) {
-        val name=EditText(this).apply{hint="Nome do roteiro";setSingleLine();setText(existing?.name?:"")}
-        val content=EditText(this).apply{hint="Logradouro;Inicial;Final;Sentido\nRua A;1;110;crescente";minLines=6;gravity=Gravity.TOP;setText(existing?.addresses?.let{addressesToCsv(it)}?:"")}
-        val box=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setPadding(dp(8),0,dp(8),0);addView(name);addView(content)}
-        AlertDialog.Builder(this).setTitle(if(existing==null)"Novo roteiro" else "Editar roteiro").setView(box).setNegativeButton("Cancelar",null).setPositiveButton("Salvar"){_,_->
-            runCatching {
-                val parsed=parseCsv(content.text.toString())
-                require(name.text.isNotBlank()&&parsed.isNotEmpty())
-                store.save(RouteDefinition(existing?.id?:java.util.UUID.randomUUID().toString(),name.text.toString().trim(),parsed))
-                refresh()
-            }.onFailure{Toast.makeText(this,"Confira o nome e o formato dos trechos.",Toast.LENGTH_LONG).show()}
-        }.show()
+    private data class SegmentFields(val cep:EditText,val street:EditText,val initial:EditText,val final:EditText,val direction:Spinner,val card:LinearLayout)
+
+    private fun field(label:String, value:String="", numeric:Boolean=false):EditText =
+        EditText(this).apply {
+            hint=label
+            setSingleLine(true)
+            setText(value)
+            textSize=14f
+            setPadding(dp(10),dp(8),dp(10),dp(8))
+            if(numeric) inputType=android.text.InputType.TYPE_CLASS_NUMBER
+            setBackgroundResource(android.R.drawable.edit_text)
+        }
+
+    private fun addSegment(container:LinearLayout, existing:List<RouteAddress> = emptyList()):SegmentFields {
+        val first=existing.firstOrNull()
+        val nums=existing.mapNotNull{it.number.toIntOrNull()}
+        val descending=first?.direction?.contains("DECRESC",true)==true
+        val card=LinearLayout(this).apply {
+            orientation=LinearLayout.VERTICAL
+            setPadding(dp(10),dp(8),dp(10),dp(10))
+            setBackgroundColor(0xff263449.toInt())
+        }
+        val heading=TextView(this).apply {
+            text="TRECHO ${container.childCount+1}"
+            textSize=12f
+            setTextColor(0xff80cbc4.toInt())
+            setPadding(0,0,0,dp(4))
+        }
+        val cep=field("CEP",first?.cep.orEmpty())
+        val street=field("Logradouro",first?.street.orEmpty())
+        val initial=field("N. Inicial",if(nums.isEmpty())"" else if(descending)nums.max().toString() else nums.min().toString(),true)
+        val final=field("N. Final",if(nums.isEmpty())"" else if(descending)nums.min().toString() else nums.max().toString(),true)
+        val direction=Spinner(this).apply {
+            adapter=ArrayAdapter(this@RouteManagerActivity,android.R.layout.simple_spinner_dropdown_item,listOf("Crescente","Decrescente"))
+            setSelection(if(descending)1 else 0)
+        }
+        card.addView(heading)
+        card.addView(cep,LinearLayout.LayoutParams(-1,-2))
+        card.addView(street,LinearLayout.LayoutParams(-1,-2))
+        val numbers=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL}
+        numbers.addView(initial,LinearLayout.LayoutParams(0,-2,1f).apply{rightMargin=dp(5)})
+        numbers.addView(final,LinearLayout.LayoutParams(0,-2,1f).apply{leftMargin=dp(5)})
+        card.addView(numbers)
+        val directionLabel=TextView(this).apply{text="Sentido";textSize=12f;setTextColor(0xffcbd5e1.toInt());setPadding(dp(2),dp(4),0,0)}
+        card.addView(directionLabel)
+        card.addView(direction,LinearLayout.LayoutParams(-1,-2))
+        container.addView(card,LinearLayout.LayoutParams(-1,-2).apply{bottomMargin=dp(10)})
+        return SegmentFields(cep,street,initial,final,direction,card)
     }
-    private fun addressesToCsv(items:List<RouteAddress>):String = items.joinToString("\n"){"${it.street};${it.number};${it.number};${it.direction}"}
+
+    private fun editRoute(existing:RouteDefinition?) {
+        val name=field("Nome do roteiro",existing?.name.orEmpty())
+        val segments=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL}
+        val grouped=existing?.addresses?.groupBy{it.segment}?.toSortedMap()?.values?.toList().orEmpty()
+        if(grouped.isEmpty()) addSegment(segments) else grouped.forEach{addSegment(segments,it)}
+        val add=Button(this).apply{text="+ ADICIONAR TRECHO";setOnClickListener{addSegment(segments)}}
+        val content=LinearLayout(this).apply{
+            orientation=LinearLayout.VERTICAL
+            setPadding(dp(8),0,dp(8),0)
+            addView(name)
+            addView(TextView(this@RouteManagerActivity).apply{text="Dados de cada trecho";textSize=14f;setTextColor(-1);setPadding(0,dp(8),0,dp(6))})
+            addView(segments)
+            addView(add)
+        }
+        val scroll=ScrollView(this).apply{addView(content)}
+        AlertDialog.Builder(this)
+            .setTitle(if(existing==null)"Novo roteiro" else "Editar roteiro")
+            .setView(scroll)
+            .setNegativeButton("Cancelar",null)
+            .setPositiveButton("Salvar"){_,_->
+                runCatching {
+                    require(name.text.isNotBlank())
+                    val parsed=mutableListOf<RouteAddress>()
+                    segmentsViews(segments).forEachIndexed{idx,s->
+                        val street=s.street.text.toString().trim()
+                        val first=s.initial.text.toString().toInt()
+                        val last=s.final.text.toString().toInt()
+                        val cepValue=s.cep.text.toString().trim()
+                        require(street.isNotBlank() && first>=0 && last>=0)
+                        val descending=s.direction.selectedItemPosition==1
+                        val step=if(descending)-1 else 1
+                        var n=if(descending)maxOf(first,last) else minOf(first,last)
+                        val stop=if(descending)minOf(first,last) else maxOf(first,last)
+                        while(true){
+                            parsed.add(RouteAddress(street=street,number=n.toString(),segment=idx+1,direction=if(descending)"DECRESCENTE" else "CRESCENTE",cep=cepValue))
+                            if(n==stop)break
+                            n+=step
+                        }
+                    }
+                    require(parsed.isNotEmpty())
+                    store.save(RouteDefinition(existing?.id?:java.util.UUID.randomUUID().toString(),name.text.toString().trim(),parsed))
+                    refresh()
+                }.onFailure{Toast.makeText(this,"Confira o nome e os campos dos trechos.",Toast.LENGTH_LONG).show()}
+            }.show()
+    }
+
+    private fun segmentsViews(container:LinearLayout):List<SegmentFields> {
+        // The five input widgets are kept in each segment card in a fixed order.
+        return (0 until container.childCount).mapNotNull { index ->
+            val card=container.getChildAt(index) as? LinearLayout ?: return@mapNotNull null
+            val cep=card.getChildAt(1) as? EditText ?: return@mapNotNull null
+            val street=card.getChildAt(2) as? EditText ?: return@mapNotNull null
+            val numbers=card.getChildAt(3) as? LinearLayout ?: return@mapNotNull null
+            val initial=numbers.getChildAt(0) as? EditText ?: return@mapNotNull null
+            val final=numbers.getChildAt(1) as? EditText ?: return@mapNotNull null
+            val direction=card.getChildAt(5) as? Spinner ?: return@mapNotNull null
+            SegmentFields(cep,street,initial,final,direction,card)
+        }
+    }
+
     private fun parseCsv(raw:String):List<RouteAddress> {
         val result=mutableListOf<RouteAddress>()
-        raw.lineSequence().map{it.trim()}.filter{it.isNotBlank()}.forEachIndexed{idx,line->
-            val p=line.split(';',',','\t').map{it.trim().trim('"')}
-            if(idx==0&&p.any{it.contains("logradouro",true)||it.contains("trecho",true)})return@forEachIndexed
+        val lines=raw.lineSequence().map{it.trim()}.filter{it.isNotBlank()}.toList()
+        val header=lines.firstOrNull().orEmpty()
+        val hasHeader=header.contains("logradouro",true)||header.contains("trecho",true)||header.contains("cep",true)
+        val newFormat=header.contains("cep",true)
+        lines.drop(if(hasHeader)1 else 0).forEachIndexed{idx,line->
+            val p=line.split(';',',','\\t').map{it.trim().trim('"')}
+            val cep:String
             val segment:Int
             val street:String
             val start:Int
             val end:Int
             val direction:String
-            if(p.size>=5) {
+            if(newFormat || (p.size>=5 && p[0].all{it.isDigit()} && p[1].isNotBlank() && p[2].toIntOrNull()!=null && p[3].toIntOrNull()!=null)) {
+                cep=p.getOrNull(0).orEmpty()
+                segment=idx+1
+                street=p.getOrNull(1).orEmpty()
+                start=p.getOrNull(2)?.toInt()?:throw IllegalArgumentException("Número inicial inválido")
+                end=p.getOrNull(3)?.toInt()?:throw IllegalArgumentException("Número final inválido")
+                direction=p.getOrNull(4)?.uppercase()?:if(end>=start)"CRESCENTE" else "DECRESCENTE"
+            } else if(p.size>=5) {
+                cep=""
                 segment=p[0].toIntOrNull()?:idx+1
                 street=p[1];start=p[2].toInt();end=p[3].toInt();direction=p[4].uppercase()
             } else {
                 require(p.size>=3)
+                cep=""
                 segment=idx+1;street=p[0];start=p[1].toInt();end=p[2].toInt()
                 direction=p.getOrNull(3)?.uppercase()?:if(end>=start)"CRESCENTE" else "DECRESCENTE"
             }
@@ -88,7 +197,11 @@ class RouteManagerActivity:Activity() {
             val step=if(descending)-1 else 1
             var n=if(descending)maxOf(start,end) else minOf(start,end)
             val last=if(descending)minOf(start,end) else maxOf(start,end)
-            while(true){result.add(RouteAddress(street=street,number=n.toString(),segment=segment,direction=if(descending)"DECRESCENTE" else "CRESCENTE"));if(n==last)break;n+=step}
+            while(true){
+                result.add(RouteAddress(street=street,number=n.toString(),segment=segment,direction=if(descending)"DECRESCENTE" else "CRESCENTE",cep=cep))
+                if(n==last)break
+                n+=step
+            }
         }
         return result
     }
