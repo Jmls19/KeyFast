@@ -61,7 +61,9 @@ class RouteStore(context:android.content.Context) {
                 list.removeAll{it.id==special.id}
                 val a=list.indexOfFirst{it.street.equals(rule.street,true)&&it.number==rule.lowAnchor}
                 val b=list.indexOfFirst{it.street.equals(rule.street,true)&&it.number==rule.highAnchor}
-                val insert=maxOf(a,b)
+                // Keep the special address immediately after the lower anchor in ascending order;
+                // when the route is reversed, this naturally places it immediately before that anchor.
+                val insert=if(a<b)a+1 else a
                 list.add(insert,special)
             }
         }
