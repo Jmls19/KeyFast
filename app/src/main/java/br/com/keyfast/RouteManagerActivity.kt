@@ -192,7 +192,7 @@ class RouteManagerActivity:Activity() {
         val result=mutableListOf<RouteAddress>()
         raw.lineSequence().forEach { line ->
             if(line.isBlank()) return@forEach
-            val cells=(if(line.contains("\\t")) line.split("\\t") else line.split(";")).map{it.trim().trim('"')}
+            val cells=(if(line.contains("\t")) line.split("\t") else line.split(";")).map{it.trim().trim('"')}
             if(cells.size<4) return@forEach
             val code=cells[0].uppercase()
             if(!isTrackingCode(code)) return@forEach
