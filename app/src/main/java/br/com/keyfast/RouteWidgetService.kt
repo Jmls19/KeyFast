@@ -20,7 +20,10 @@ class RouteWidgetService:Service() {
     private lateinit var store:RouteStore
     private var panel:LinearLayout?=null
     private var showingList=false
-    private val blue=Color.rgb(32,199,217)
+    private val blue=Color.rgb(18,99,217)
+    private val navy=Color.rgb(7,23,50)
+    private val ink=Color.rgb(12,31,65)
+    private val pale=Color.rgb(225,237,255)
     override fun onCreate(){super.onCreate();wm=getSystemService(WINDOW_SERVICE) as WindowManager;store=RouteStore(this)}
     override fun onStartCommand(intent:Intent?,flags:Int,startId:Int):Int {
         if(intent?.action==ACTION_HIDE){hide();stopSelf();return START_NOT_STICKY}
@@ -29,7 +32,7 @@ class RouteWidgetService:Service() {
     }
     override fun onBind(intent:Intent?):IBinder?=null
     private fun dp(v:Int)=(v*resources.displayMetrics.density+0.5f).toInt()
-    private fun bg(color:Int)=GradientDrawable().apply{setColor(color);cornerRadius=dp(13).toFloat();setStroke(dp(1),Color.argb(90,255,255,255))}
+    private fun bg(color:Int)=GradientDrawable().apply{setColor(color);cornerRadius=dp(13).toFloat();setStroke(dp(1),Color.rgb(205,222,249))}
     private fun activeRoute():RouteDefinition? {
         val id=store.activeId()?:return null
         val route=store.routes().firstOrNull{it.id==id}?:return null
@@ -40,8 +43,8 @@ class RouteWidgetService:Service() {
         hide();showingList=false
         val route=activeRoute()
         if(route==null){stopSelf();return}
-        val root=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setPadding(dp(10),dp(8),dp(10),dp(8));background=bg(Color.rgb(16,24,39));elevation=dp(12).toFloat()}
-        val header=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER_VERTICAL}
+        val root=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setPadding(dp(10),dp(8),dp(10),dp(8));background=bg(Color.rgb(250,252,255));elevation=dp(12).toFloat()}
+        val header=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER_VERTICAL;setPadding(dp(8),dp(7),dp(4),dp(7));background=bg(blue)}
         header.addView(TextView(this).apply{text="KEYFAST • ${route.name}";textSize=13f;setTextColor(Color.WHITE);setTypeface(null,1)},LinearLayout.LayoutParams(0,-2,1f))
         header.addView(iconButton("📋","Abrir lista completa"){showFullList()})
         header.addView(iconButton("✕","Fechar widget"){hide();stopSelf()})
@@ -49,21 +52,21 @@ class RouteWidgetService:Service() {
         val pending=route.addresses.filter{!it.delivered}.take(3)
         pending.forEachIndexed{index,address->root.addView(addressRow(route,address,index+1,false))}
         if(pending.isEmpty())root.addView(TextView(this).apply{text="Roteiro concluído!";setTextColor(Color.GREEN);setPadding(0,dp(12),0,dp(8))})
-        root.addView(TextView(this).apply{text="${route.addresses.count{it.delivered}} / ${route.addresses.size} entregues";textSize=10f;setTextColor(0xffcbd5e1.toInt());gravity=Gravity.END})
+        root.addView(TextView(this).apply{text="${route.addresses.count{it.delivered}} / ${route.addresses.size} entregues";textSize=10f;setTextColor(ink);gravity=Gravity.END})
         panel=root
         val params=WindowManager.LayoutParams(dp(330),WindowManager.LayoutParams.WRAP_CONTENT,WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,PixelFormat.TRANSLUCENT).apply{gravity=Gravity.TOP or Gravity.CENTER_HORIZONTAL;y=dp(28)}
         wm.addView(root,params)
     }
     private fun iconButton(label:String,description:String,action:()->Unit)=TextView(this).apply{text=label;textSize=19f;contentDescription=description;gravity=Gravity.CENTER;setTextColor(Color.WHITE);setPadding(dp(7),dp(3),dp(7),dp(3));setOnClickListener{action()}}
     private fun addressRow(route:RouteDefinition,address:RouteAddress,number:Int,full:Boolean):View {
-        val row=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER_VERTICAL;setPadding(dp(8),dp(5),dp(4),dp(5));background=bg(Color.rgb(38,52,73))}
+        val row=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER_VERTICAL;setPadding(dp(8),dp(5),dp(4),dp(5));background=bg(pale)}
         val label=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL}
-        label.addView(TextView(this).apply{text=if(full)"${address.street}, ${address.number}" else "${address.street} ${address.number}";textSize=13f;setTextColor(Color.WHITE);setTypeface(null,1);maxLines=2})
-        if(address.objectCode.isNotBlank())label.addView(TextView(this).apply{text="${address.objectCode} • CEP ${address.cep}";textSize=9f;setTextColor(0xff80cbc4.toInt())})
+        label.addView(TextView(this).apply{text=if(full)"${address.street}, ${address.number}" else "${address.street} ${address.number}";textSize=13f;setTextColor(ink);setTypeface(null,1);maxLines=2})
+        if(address.objectCode.isNotBlank())label.addView(TextView(this).apply{text="${address.objectCode} • CEP ${address.cep}";textSize=9f;setTextColor(blue)})
         if(store.rules().any{it.street.equals(address.street,true)&&it.number==address.number})label.addView(TextView(this).apply{text="REFERÊNCIA SALVA";textSize=9f;setTextColor(blue)})
         row.addView(label,LinearLayout.LayoutParams(0,-2,1f))
         row.addView(actionButton("✅",Color.rgb(22,130,75),"Confirmar entrega"){confirm(route,address)})
-        row.addView(actionButton("🔀",Color.rgb(35,91,145),"Salvar posição numérica"){saveRandomReference(route,address)})
+        row.addView(actionButton("🔀",Color.rgb(18,99,217),"Salvar posição numérica"){saveRandomReference(route,address)})
         return row
     }
     private fun actionButton(symbol:String,color:Int,description:String,action:()->Unit)=TextView(this).apply{
@@ -99,7 +102,7 @@ class RouteWidgetService:Service() {
         val scroll=ScrollView(this);val rows=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL}
         route.addresses.forEachIndexed{index,address->
             if(!address.delivered){rows.addView(TextView(this).apply{text="${index+1}. ";setTextColor(blue);textSize=10f});rows.addView(addressRow(route,address,index+1,true),LinearLayout.LayoutParams(-1,-2).apply{bottomMargin=dp(5)})}
-            else rows.addView(TextView(this).apply{text="✓ ${address.street}, ${address.number}";textSize=11f;setTextColor(0xff86efac.toInt());setPadding(dp(8),dp(5),dp(8),dp(5))})
+            else rows.addView(TextView(this).apply{text="✓ ${address.street}, ${address.number}";textSize=11f;setTextColor(Color.rgb(22,130,75));setPadding(dp(8),dp(5),dp(8),dp(5))})
         }
         scroll.addView(rows);root.addView(scroll,LinearLayout.LayoutParams(-1,dp(420)))
         panel=root
