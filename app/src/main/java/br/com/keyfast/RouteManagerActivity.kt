@@ -176,7 +176,7 @@ class RouteManagerActivity:Activity() {
             val start:Int
             val end:Int
             val direction:String
-            if(newFormat || (p.size>=5 && p[0].all{it.isDigit()} && p[1].isNotBlank() && p[2].toIntOrNull()!=null && p[3].toIntOrNull()!=null)) {
+            if(newFormat || (!hasHeader && p.size>=5 && p[0].filter{it.isDigit()}.length>=7 && p[2].toIntOrNull()!=null && p[3].toIntOrNull()!=null)) {
                 cep=p.getOrNull(0).orEmpty()
                 segment=idx+1
                 street=p.getOrNull(1).orEmpty()
