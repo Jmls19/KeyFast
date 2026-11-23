@@ -346,8 +346,7 @@ class RouteManagerActivity:Activity() {
                 }
             };p.next()
         }
-        return rows.joinToString("
-"){r->(0..(r.keys.maxOrNull()?:0)).joinToString(";"){i->r[i].orEmpty().replace(";"," ")}}
+        return rows.joinToString("\n"){r->(0..(r.keys.maxOrNull()?:0)).joinToString(";"){i->r[i].orEmpty().replace(";"," ")}}
     }
     private fun exportRoute(route:RouteDefinition) {
         exporting=route
