@@ -77,11 +77,13 @@ class RouteWidgetService:Service() {
         val after=EditText(this).apply{hint="Referência numérica anterior";inputType=InputType.TYPE_CLASS_NUMBER}
         val before=EditText(this).apply{hint="Referência numérica posterior";inputType=InputType.TYPE_CLASS_NUMBER}
         val box=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setPadding(dp(18),dp(4),dp(18),0);addView(after);addView(before)}
-        AlertDialog.Builder(this).setTitle("Salvar número fora de ordem").setMessage("${address.street}, ${address.number}\nInforme os dois números entre os quais este endereço deve entrar. Isso NÃO confirma a entrega.").setView(box).setNegativeButton("Cancelar",null).setPositiveButton("Salvar referência"){_,_->
+        val dialog=AlertDialog.Builder(this).setTitle("Salvar número fora de ordem").setMessage("${address.street}, ${address.number}\nInforme os dois números entre os quais este endereço deve entrar. Isso NÃO confirma a entrega.").setView(box).setNegativeButton("Cancelar",null).setPositiveButton("Salvar referência"){_,_->
             val a=after.text.toString().trim();val b=before.text.toString().trim()
             if(a.isBlank()||b.isBlank()||a==b)Toast.makeText(this,"Informe duas referências diferentes.",Toast.LENGTH_SHORT).show()
             else {store.saveRule(NumberRule(address.street,address.number,minOf(a.toIntOrNull()?:Int.MAX_VALUE,b.toIntOrNull()?:Int.MAX_VALUE).toString(),maxOf(a.toIntOrNull()?:Int.MIN_VALUE,b.toIntOrNull()?:Int.MIN_VALUE).toString()));Toast.makeText(this,"Referência salva. Entrega continua pendente.",Toast.LENGTH_SHORT).show();refreshCurrent()}
-        }.show().window?.setType(WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY)
+        }.create()
+        dialog.window?.setType(WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY)
+        dialog.show()
     }
     private fun refreshCurrent(){if(showingList)showFullList()else showWidget()}
     private fun showFullList(){
