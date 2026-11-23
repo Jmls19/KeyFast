@@ -54,11 +54,11 @@ class KeyFastImeService:InputMethodService() {
  private var requestedToken=""
  private var spellRequestToken=""
  private var shownSuggestions=emptyList<String>()
- private val panel=Color.rgb(16,24,39)
- private val keyColor=Color.rgb(38,52,73)
- private val specialColor=Color.rgb(31,45,65)
- private val cyan=Color.rgb(32,199,217)
- private val ink=Color.rgb(12,19,32)
+ private val panel=Color.rgb(7,23,50)
+ private val keyColor=Color.rgb(250,252,255)
+ private val specialColor=Color.rgb(220,232,250)
+ private val cyan=Color.rgb(18,99,217)
+ private val ink=Color.rgb(12,31,65)
  private val interRegular by lazy { Typeface.createFromAsset(assets,"fonts/Inter-Regular.ttf") }
  private val interMedium by lazy { Typeface.createFromAsset(assets,"fonts/Inter-Medium.ttf") }
 
@@ -81,7 +81,7 @@ class KeyFastImeService:InputMethodService() {
   bar.addView(suggestions,LinearLayout.LayoutParams(0,-1,1f))
   pasteButton=TextView(this).apply{
    text="📋";textSize=21f;gravity=Gravity.CENTER;setTextColor(cyan);typeface=interMedium
-   background=keyBg(Color.rgb(35,91,105));isClickable=true;setPadding(dp(3),0,dp(3),0)
+   background=keyBg(Color.rgb(18,99,217));isClickable=true;setPadding(dp(3),0,dp(3),0)
    contentDescription="Colar texto da área de transferência"
    visibility=View.GONE
    setOnClickListener{pasteFromClipboard()}
@@ -91,7 +91,7 @@ class KeyFastImeService:InputMethodService() {
   clipboardManager?.addPrimaryClipChangedListener(clipboardListener)
   val manage=TextView(this).apply{
    text="⚙️";textSize=24f;gravity=Gravity.CENTER;setTextColor(cyan);typeface=interMedium
-   background=keyBg(Color.rgb(35,91,105));isClickable=true;setPadding(dp(5),0,dp(5),0)
+   background=keyBg(Color.rgb(18,99,217));isClickable=true;setPadding(dp(5),0,dp(5),0)
    contentDescription="Gerenciar atalhos";setOnClickListener{showManageMenu(this)}
   }
   bar.addView(manage,LinearLayout.LayoutParams(dp(44),dp(34)))
@@ -154,23 +154,23 @@ class KeyFastImeService:InputMethodService() {
   buildKeys()
   valueViews.clear()
   val outer=LinearLayout(this).apply{
-   orientation=LinearLayout.VERTICAL;setPadding(dp(16),dp(14),dp(16),dp(14));background=keyBg(Color.rgb(32,42,56))
+   orientation=LinearLayout.VERTICAL;setPadding(dp(16),dp(14),dp(16),dp(14));background=keyBg(Color.rgb(250,252,255))
   }
   outer.addView(TextView(this).apply{
    text=if(item==null)"NOVO ATALHO" else "EDITAR ATALHO"
-   textSize=16f;typeface=interMedium;setTextColor(cyan);gravity=Gravity.CENTER;setPadding(0,0,0,dp(10))
+   textSize=17f;typeface=interMedium;setTextColor(ink);gravity=Gravity.CENTER;setPadding(0,0,0,dp(10))
   })
   val labels=listOf("ATALHO","NOME / DESTINATÁRIO","DOCUMENTO")
   for(i in 0..2){
    val card=LinearLayout(this).apply{
     orientation=LinearLayout.VERTICAL;setPadding(dp(10),dp(6),dp(10),dp(6))
-    background=keyBg(if(i==formField)Color.rgb(35,91,105)else Color.rgb(38,52,73))
+    background=keyBg(if(i==formField)Color.rgb(18,99,217)else Color.rgb(250,252,255))
     isClickable=true;setOnClickListener{formField=i;updateForm()}
    }
-   card.addView(TextView(this).apply{text=labels[i];textSize=9f;typeface=interMedium;setTextColor(cyan)})
+   card.addView(TextView(this).apply{text=labels[i];textSize=10f;typeface=interMedium;setTextColor(cyan)})
    val value=TextView(this).apply{
     text=formFieldText(i)
-    textSize=14f;setTextColor(Color.WHITE);typeface=interRegular;gravity=Gravity.CENTER_VERTICAL;maxLines=1
+    textSize=14f;setTextColor(ink);typeface=interRegular;gravity=Gravity.CENTER_VERTICAL;maxLines=1
     isSingleLine=true;setHorizontallyScrolling(true);ellipsize=null
    }
    valueViews.add(value);card.addView(value,LinearLayout.LayoutParams(-1,dp(29)))
@@ -203,11 +203,11 @@ class KeyFastImeService:InputMethodService() {
  }
 
  private fun formIconButton(icon:String,description:String,color:Int,action:()->Unit)=TextView(this).apply{
-  text=icon;textSize=22f;gravity=Gravity.CENTER;typeface=interMedium;setTextColor(Color.WHITE);background=keyBg(color)
+  text=icon;textSize=22f;gravity=Gravity.CENTER;typeface=interMedium;setTextColor(if(color==specialColor)ink else Color.WHITE);background=keyBg(color)
   isClickable=true;isFocusable=false;contentDescription=description;setOnClickListener{action()}
  }
  private fun actionText(label:String,color:Int,action:()->Unit)=TextView(this).apply{
-  text=label;textSize=11f;gravity=Gravity.CENTER;typeface=interMedium;setTextColor(Color.WHITE);background=keyBg(color);isClickable=true;setOnClickListener{action()}
+  text=label;textSize=11f;gravity=Gravity.CENTER;typeface=interMedium;setTextColor(if(color==specialColor)ink else Color.WHITE);background=keyBg(color);isClickable=true;setOnClickListener{action()}
  }
  private fun formFieldText(index:Int):CharSequence {
   val value=values[index]
@@ -232,7 +232,7 @@ class KeyFastImeService:InputMethodService() {
  private fun updateForm(){
   valueViews.forEachIndexed{i,v->
    v.text=formFieldText(i)
-   (v.parent as? View)?.background=keyBg(if(i==formField)Color.rgb(35,91,105)else Color.rgb(38,52,73))
+   (v.parent as? View)?.background=keyBg(if(i==formField)Color.rgb(18,99,217)else Color.rgb(250,252,255))
    v.post{scrollFormValueToEnd(v)}
   }
  }
@@ -285,8 +285,8 @@ class KeyFastImeService:InputMethodService() {
   }
   addMenuButton("✕",Color.rgb(125,55,60),30){}
   addMenuButton("NOVO",cyan,54){showForm(null)}
-  addMenuButton("ALTERAR",Color.rgb(29,137,166),68){showList(true)}
-  addMenuButton("EXCLUIR",Color.rgb(38,52,73),64){showList(false)}
+  addMenuButton("ALTERAR",Color.rgb(28,111,226),68){showList(true)}
+  addMenuButton("EXCLUIR",Color.rgb(250,252,255),64){showList(false)}
   popup=PopupWindow(row,width,height,false).apply{
    isOutsideTouchable=true;isFocusable=false
    setBackgroundDrawable(keyBg(Color.TRANSPARENT))
@@ -305,27 +305,27 @@ class KeyFastImeService:InputMethodService() {
  private fun showList(edit:Boolean){
   val items=store.all().sortedBy{it.trigger.lowercase()}
   if(items.isEmpty()){Toast.makeText(this,"Nenhum atalho cadastrado.",Toast.LENGTH_SHORT).show();return}
-  val box=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setPadding(dp(6),dp(6),dp(6),dp(6));background=keyBg(Color.rgb(32,42,56))}
-  box.addView(TextView(this).apply{text=if(edit)"SELECIONE PARA EDITAR"else"SELECIONE PARA EXCLUIR";textSize=11f;typeface=interMedium;setTextColor(cyan);setPadding(dp(8),dp(7),dp(8),dp(7))})
+  val box=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setPadding(dp(6),dp(6),dp(6),dp(6));background=keyBg(Color.rgb(250,252,255))}
+  box.addView(TextView(this).apply{text=if(edit)"SELECIONE PARA EDITAR"else"SELECIONE PARA EXCLUIR";textSize=12f;typeface=interMedium;setTextColor(ink);setPadding(dp(8),dp(7),dp(8),dp(7))})
   lateinit var popup:PopupWindow
   items.forEach{item->box.addView(TextView(this).apply{
-   text=item.trigger+"  •  "+item.recipientName;textSize=13f;typeface=interRegular;setTextColor(Color.WHITE);gravity=Gravity.CENTER_VERTICAL;setPadding(dp(10),0,dp(10),0);isClickable=true
+   text=item.trigger+"  •  "+item.recipientName;textSize=13f;typeface=interRegular;setTextColor(ink);gravity=Gravity.CENTER_VERTICAL;setPadding(dp(10),0,dp(10),0);isClickable=true
    setBackgroundResource(android.R.drawable.list_selector_background)
    setOnClickListener{popup.dismiss();if(edit)showForm(item)else confirmDelete(item)}
   },LinearLayout.LayoutParams(dp(260),dp(42)))}
   popup=PopupWindow(box,dp(272),ViewGroup.LayoutParams.WRAP_CONTENT,true);popup.isOutsideTouchable=true
-  popup.setBackgroundDrawable(keyBg(Color.rgb(32,42,56)));popup.elevation=dp(10).toFloat()
+  popup.setBackgroundDrawable(keyBg(Color.rgb(250,252,255)));popup.elevation=dp(10).toFloat()
   popup.showAtLocation(root,Gravity.TOP or Gravity.CENTER_HORIZONTAL,0,dp(42))
  }
  private fun confirmDelete(item:RecipientShortcut){
-  val box=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setPadding(dp(14),dp(12),dp(14),dp(10));background=keyBg(Color.rgb(32,42,56))}
-  box.addView(TextView(this).apply{text="Excluir o atalho "+item.trigger+"?";textSize=14f;typeface=interRegular;setTextColor(Color.WHITE)})
+  val box=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setPadding(dp(14),dp(12),dp(14),dp(10));background=keyBg(Color.rgb(250,252,255))}
+  box.addView(TextView(this).apply{text="Excluir o atalho "+item.trigger+"?";textSize=14f;typeface=interRegular;setTextColor(ink)})
   val buttons=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.END}
   lateinit var popup:PopupWindow
   buttons.addView(actionText("CANCELAR",specialColor){popup.dismiss()},LinearLayout.LayoutParams(dp(92),dp(34)).apply{setMargins(0,dp(12),dp(6),0)})
   buttons.addView(actionText("EXCLUIR",Color.rgb(170,65,65)){popup.dismiss();store.delete(item.id);Toast.makeText(this,"Atalho excluído.",Toast.LENGTH_SHORT).show()},LinearLayout.LayoutParams(dp(82),dp(34)).apply{setMargins(0,dp(12),0,0)})
   box.addView(buttons);popup=PopupWindow(box,dp(290),ViewGroup.LayoutParams.WRAP_CONTENT,true);popup.isOutsideTouchable=true
-  popup.setBackgroundDrawable(keyBg(Color.rgb(32,42,56)));popup.elevation=dp(10).toFloat();popup.showAtLocation(root,Gravity.CENTER,0,0)
+  popup.setBackgroundDrawable(keyBg(Color.rgb(250,252,255)));popup.elevation=dp(10).toFloat();popup.showAtLocation(root,Gravity.CENTER,0,0)
  }
 
  private fun addRow(labels:List<String>,left:Float=0f,right:Float=0f,number:Boolean=false){
@@ -347,7 +347,7 @@ class KeyFastImeService:InputMethodService() {
  private fun showAccentOptions(letter:String){
   val choices=when(letter.lowercase()){"a"->listOf("á","à","â","ã");"e"->listOf("é","ê");"i"->listOf("í");"o"->listOf("ó","ô","õ");"u"->listOf("ú");"c"->listOf("ç");else->emptyList()}
   if(choices.isEmpty())return
-  val box=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL;setPadding(dp(5),dp(5),dp(5),dp(5));setBackgroundColor(Color.rgb(37,43,53))}
+  val box=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL;setPadding(dp(5),dp(5),dp(5),dp(5));setBackgroundColor(Color.rgb(220,232,250))}
   lateinit var popup:PopupWindow
   choices.forEach{ch->val shown=if(caps)ch.uppercase()else ch;box.addView(TextView(this).apply{
    text=shown;textSize=22f;gravity=Gravity.CENTER;typeface=interMedium;setTextColor(Color.WHITE);background=keyBg(cyan);isClickable=true;setOnClickListener{type(shown);popup.dismiss()}
@@ -361,10 +361,10 @@ class KeyFastImeService:InputMethodService() {
   // Mantém o foco no editor/IME ao escolher um caractere acentuado.
   popup.showAtLocation(root,Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL,0,dp(190))
  }
- private fun keyBg(color:Int)=GradientDrawable().apply{setColor(color);cornerRadius=dp(11).toFloat()}
+ private fun keyBg(color:Int)=GradientDrawable().apply{setColor(color);cornerRadius=dp(12).toFloat();if(color==Color.WHITE||color==Color.rgb(250,252,255))setStroke(dp(1),Color.rgb(218,230,249))}
  private fun addKey(row:LinearLayout,label:String,weight:Float,color:Int,longPress:(()->Unit)?=null,action:()->Unit){
   val key=TextView(this).apply{
-   text=label;textSize=if(label=="—")22f else 19f;gravity=Gravity.CENTER;setTextColor(Color.WHITE);typeface=interMedium
+   text=label;textSize=if(label=="—")22f else 19f;gravity=Gravity.CENTER;setTextColor(if(color==keyColor||color==specialColor) ink else Color.WHITE);typeface=interMedium
    val mask=keyBg(Color.WHITE)
    background=if(Build.VERSION.SDK_INT>=Build.VERSION_CODES.LOLLIPOP)RippleDrawable(ColorStateList.valueOf(Color.argb(95,255,255,255)),keyBg(color),mask)else keyBg(color)
    isClickable=true;isFocusable=true
@@ -573,8 +573,8 @@ class KeyFastImeService:InputMethodService() {
   if(match!=null){
    requestedToken=token;shownSuggestions=emptyList()
    suggestions.addView(TextView(this).apply{
-    text=match.trigger+"   ›   "+match.recipientName;textSize=14f;gravity=Gravity.CENTER_VERTICAL;setTextColor(Color.WHITE)
-    setPadding(dp(13),0,dp(13),0);background=keyBg(Color.rgb(45,75,88));isClickable=true;setOnClickListener{expand(match)}
+    text=match.trigger+"   ›   "+match.recipientName;textSize=14f;gravity=Gravity.CENTER_VERTICAL;setTextColor(ink)
+    setPadding(dp(13),0,dp(13),0);background=keyBg(Color.rgb(225,237,255));isClickable=true;setOnClickListener{expand(match)}
    },LinearLayout.LayoutParams(-1,-1))
    return
   }
@@ -590,8 +590,8 @@ class KeyFastImeService:InputMethodService() {
   suggestions.removeAllViews()
   words.forEach{word->
    val item=TextView(this).apply{
-    text=word;textSize=14f;gravity=Gravity.CENTER;setTextColor(Color.WHITE)
-    setPadding(dp(10),0,dp(10),0);background=keyBg(Color.rgb(45,75,88));isClickable=true
+    text=word;textSize=14f;gravity=Gravity.CENTER;setTextColor(ink)
+    setPadding(dp(10),0,dp(10),0);background=keyBg(Color.rgb(225,237,255));isClickable=true
     setOnClickListener{
      val ic=currentInputConnection?:return@setOnClickListener
      ic.deleteSurroundingText(token.length,0);ic.commitText(word,1);refreshFromCursor()
