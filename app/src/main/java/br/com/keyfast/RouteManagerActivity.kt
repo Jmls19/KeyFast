@@ -10,11 +10,18 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.*
 import android.graphics.Color
+import android.graphics.Bitmap
+import android.graphics.pdf.PdfRenderer
+import android.os.ParcelFileDescriptor
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.util.Xml
 import java.io.ByteArrayInputStream
 import java.util.zip.ZipInputStream
+import java.io.File
+import com.google.mlkit.vision.common.InputImage
+import com.google.mlkit.vision.text.TextRecognition
+import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 
 class RouteManagerActivity:Activity() {
     private lateinit var store:RouteStore
@@ -23,6 +30,7 @@ class RouteManagerActivity:Activity() {
     private val saveFile=4102
     private var exporting:RouteDefinition?=null
     private var expandedSegmentDetails:LinearLayout?=null
+    private val textRecognizer by lazy { TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS) }
     private val navy=Color.rgb(7,23,50)
     private val blue=Color.rgb(18,99,217)
     private val pale=Color.rgb(225,237,255)
@@ -37,7 +45,7 @@ class RouteManagerActivity:Activity() {
         window.statusBarColor=navy;window.navigationBarColor=navy
         val root=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setPadding(dp(18),dp(20),dp(18),dp(16));background=GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,intArrayOf(navy,Color.rgb(5,17,39)))}
         root.addView(TextView(this).apply{text="ROTEIROS";textSize=25f;typeface=Typeface.create("sans-serif-medium",Typeface.NORMAL);setTextColor(Color.WHITE);setPadding(dp(2),0,0,dp(14))})
-        root.addView(action("▣  IMPORTAR ROTEIRO POR ARQUIVO",true){val i=Intent(Intent.ACTION_OPEN_DOCUMENT).apply{addCategory(Intent.CATEGORY_OPENABLE);type="*/*";putExtra(Intent.EXTRA_MIME_TYPES,arrayOf("text/csv","text/plain","application/json","application/octet-stream"))};startActivityForResult(i,openFile)},LinearLayout.LayoutParams(-1,dp(50)).apply{bottomMargin=dp(9)})
+        root.addView(action("▣  IMPORTAR ROTEIRO POR ARQUIVO",true){val i=Intent(Intent.ACTION_OPEN_DOCUMENT).apply{addCategory(Intent.CATEGORY_OPENABLE);type="*/*";putExtra(Intent.EXTRA_MIME_TYPES,arrayOf("text/csv","text/plain","application/json","application/octet-stream","application/pdf","image/*","application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))};startActivityForResult(i,openFile)},LinearLayout.LayoutParams(-1,dp(50)).apply{bottomMargin=dp(9)})
         root.addView(action("☷  IMPORTAR LISTA DE ENTREGAS (SRO)",false){pasteDeliveryList()},LinearLayout.LayoutParams(-1,dp(50)).apply{bottomMargin=dp(9)})
         root.addView(action("+  CRIAR ROTEIRO",true){editRoute(null)},LinearLayout.LayoutParams(-1,dp(50)).apply{bottomMargin=dp(16)})
         val scroll=ScrollView(this);list=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL};scroll.addView(list);root.addView(scroll,LinearLayout.LayoutParams(-1,0,1f))
@@ -395,6 +403,96 @@ class RouteManagerActivity:Activity() {
         }
         return rows.joinToString("\n"){r->(0..(r.keys.maxOrNull()?:0)).joinToString(";"){i->r[i].orEmpty().replace(";"," ")}}
     }
+    private fun recognizeImage(uri:Uri,name:String) {
+        val progress=AlertDialog.Builder(this).setTitle("Reconhecendo lista").setMessage("Lendo o texto da imagem...").setCancelable(false).create()
+        progress.show()
+        runCatching { InputImage.fromFilePath(this,uri) }.onSuccess { image ->
+            textRecognizer.process(image)
+                .addOnSuccessListener { result -> progress.dismiss(); showOcrReview(result.text,name) }
+                .addOnFailureListener { error -> progress.dismiss(); Toast.makeText(this,"Falha no reconhecimento: \${error.localizedMessage}",Toast.LENGTH_LONG).show() }
+        }.onFailure { progress.dismiss();Toast.makeText(this,"Não foi possível abrir a imagem.",Toast.LENGTH_LONG).show() }
+    }
+
+    private fun recognizePdf(uri:Uri,name:String) {
+        val progress=AlertDialog.Builder(this).setTitle("Reconhecendo PDF").setMessage("Lendo as páginas do documento...").setCancelable(false).create()
+        progress.show()
+        runCatching {
+            val file=File(cacheDir,"keyfast_ocr_\${System.currentTimeMillis()}.pdf")
+            contentResolver.openInputStream(uri)!!.use { input -> file.outputStream().use { input.copyTo(it) } }
+            file
+        }.onSuccess { file ->
+            runCatching {
+                val descriptor=ParcelFileDescriptor.open(file,ParcelFileDescriptor.MODE_READ_ONLY)
+                PdfRenderer(descriptor)
+            }.onSuccess { renderer ->
+                val output=StringBuilder()
+                fun nextPage(index:Int) {
+                    if(index>=renderer.pageCount) {
+                        renderer.close();progress.dismiss();file.delete()
+                        showOcrReview(output.toString(),name);return
+                    }
+                    val page=renderer.openPage(index)
+                    val scale=minOf(2.0,2000.0/maxOf(page.width,page.height))
+                    val bitmap=Bitmap.createBitmap((page.width*scale).toInt().coerceAtLeast(1),(page.height*scale).toInt().coerceAtLeast(1),Bitmap.Config.ARGB_8888)
+                    page.render(bitmap,null,null,PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY);page.close()
+                    textRecognizer.process(InputImage.fromBitmap(bitmap,0))
+                        .addOnSuccessListener { result -> output.append("\n").append(result.text);bitmap.recycle();nextPage(index+1) }
+                        .addOnFailureListener { bitmap.recycle();nextPage(index+1) }
+                }
+                nextPage(0)
+            }.onFailure { progress.dismiss();file.delete();Toast.makeText(this,"Não foi possível abrir o PDF.",Toast.LENGTH_LONG).show() }
+        }.onFailure { progress.dismiss();Toast.makeText(this,"Falha ao ler o arquivo PDF.",Toast.LENGTH_LONG).show() }
+    }
+
+    private fun showOcrReview(raw:String,name:String) {
+        if(raw.isBlank()) { Toast.makeText(this,"Nenhum texto foi reconhecido no documento.",Toast.LENGTH_LONG).show();return }
+        val input=EditText(this).apply { setText(raw);minLines=10;gravity=Gravity.TOP;setTextIsSelectable(true) }
+        val scroll=ScrollView(this).apply { addView(input) }
+        AlertDialog.Builder(this).setTitle("Conferir texto reconhecido")
+            .setMessage("Confira o texto extraído. Você pode corrigir antes de importar os códigos e endereços.")
+            .setView(scroll).setNegativeButton("Cancelar",null)
+            .setPositiveButton("RECONHECER OBJETOS") { _,_ -> importRecognizedText(input.text.toString(),name) }
+            .show().also { styleDialog(it) }
+    }
+
+    private fun importRecognizedText(raw:String,name:String) {
+        runCatching {
+            val addresses=parseRecognizedObjects(raw)
+            require(addresses.isNotEmpty()) { "Nenhum código de objeto dos Correios foi reconhecido." }
+            val routeName=EditText(this).apply { setText(name);hint="Nome do roteiro";setSingleLine() }
+            AlertDialog.Builder(this).setTitle("\${addresses.size} objetos reconhecidos").setMessage("Confirme o nome para salvar a lista.")
+                .setView(routeName).setNegativeButton("CANCELAR",null)
+                .setPositiveButton("SALVAR LISTA") { _,_ ->
+                    val title=routeName.text.toString().trim().ifBlank { name }
+                    store.save(RouteDefinition(name=title,addresses=addresses))
+                    refresh()
+                    Toast.makeText(this,"\${addresses.size} objetos importados.",Toast.LENGTH_LONG).show()
+                }.show().also { styleDialog(it) }
+        }.onFailure { Toast.makeText(this,it.message?: "Não foi possível reconhecer os objetos.",Toast.LENGTH_LONG).show() }
+    }
+
+    private fun parseRecognizedObjects(raw:String):List<RouteAddress> {
+        val lines=raw.lines().map { it.trim() }.filter { it.isNotBlank() }
+        val codeRegex=Regex("(?i)\\b[A-Z]{2}\\d{9}[A-Z]{2}\\b")
+        val hits=mutableListOf<Pair<Int,String>>()
+        lines.forEachIndexed { index,line -> codeRegex.findAll(line).forEach { hits.add(index to it.value.uppercase()) } }
+        val result=mutableListOf<RouteAddress>()
+        hits.forEachIndexed { hitIndex,hit ->
+            val nextLine=hits.getOrNull(hitIndex+1)?.first ?: lines.size
+            val chunk=lines.subList(hit.first,nextLine).joinToString(" ")
+            val code=hit.second
+            val cleaned=chunk.replace(codeRegex," ").replace(Regex("(?i)\\b(CEP|OBJETO|ORDEM|ENDEREÇO)\\b")," ")
+            val cep=Regex("\\b\\d{5}-?\\d{3}\\b").find(cleaned)?.value.orEmpty()
+            val withoutCep=cleaned.replace(Regex("\\b\\d{5}-?\\d{3}\\b")," ")
+            val normalized=withoutCep.replace(Regex("[|;•]+")," ").replace(Regex("\\s+")," ").trim(" -,:")
+            val numberMatch=Regex("(?:,|\\s)(\\d+[A-Za-z]?)$").find(normalized)
+            val house=numberMatch?.groupValues?.get(1) ?: "0"
+            val street=if(numberMatch!=null)normalized.removeRange(numberMatch.range).trim(" -,:") else normalized
+            result.add(RouteAddress(street=street.ifBlank { "Endereço a conferir" },number=house,segment=1,direction="LISTA IMPORTADA",cep=cep,objectCode=code))
+        }
+        return result.distinctBy { it.objectCode }
+    }
+
     private fun exportRoute(route:RouteDefinition) {
         exporting=route
         val i=Intent(Intent.ACTION_CREATE_DOCUMENT).apply{addCategory(Intent.CATEGORY_OPENABLE);type="application/json";putExtra(Intent.EXTRA_TITLE,route.name.replace(Regex("[^A-Za-z0-9_-]"),"_")+".keyfast")}
@@ -404,18 +502,26 @@ class RouteManagerActivity:Activity() {
         super.onActivityResult(requestCode,resultCode,data);if(resultCode!=RESULT_OK||data?.data==null)return
         val uri=data.data!!
         when(requestCode){
-            openFile->runCatching{
-                val bytes=contentResolver.openInputStream(uri)!!.use{it.readBytes()}
-                val raw=if(bytes.size>=2&&bytes[0]==0x50.toByte()&&bytes[1]==0x4b.toByte())parseXlsx(bytes) else String(bytes,Charsets.UTF_8)
-                if(raw.trimStart().startsWith("{"))store.importJson(raw)
-                else if(raw.lineSequence().any{line->line.split("\t").firstOrNull()?.trim()?.let{isTrackingCode(it)}==true || line.split(";").firstOrNull()?.trim()?.let{isTrackingCode(it)}==true}) {
-                    importDeliveryText(raw,uri.lastPathSegment?.substringAfterLast(':')?.substringAfterLast('/')?.substringBeforeLast('.')?: "Lista SRO")
-                } else {
-                    val title=uri.lastPathSegment?.substringAfterLast(':')?.substringAfterLast('/')?.substringBeforeLast('.')?.ifBlank{"Roteiro importado"}?:"Roteiro importado"
-                    store.save(RouteDefinition(name=title,addresses=parseCsv(raw)))
+            openFile->{
+                val mime=contentResolver.getType(uri).orEmpty().lowercase()
+                val filename=uri.lastPathSegment?.substringAfterLast(':')?.substringAfterLast('/')?.substringBeforeLast('.')?.ifBlank{"Lista importada"}?:"Lista importada"
+                when {
+                    mime=="application/pdf" || uri.lastPathSegment?.endsWith(".pdf",true)==true->recognizePdf(uri,filename)
+                    mime.startsWith("image/")->recognizeImage(uri,filename)
+                    else->runCatching{
+                        val bytes=contentResolver.openInputStream(uri)!!.use{it.readBytes()}
+                        val raw=if(bytes.size>=2&&bytes[0]==0x50.toByte()&&bytes[1]==0x4b.toByte())parseXlsx(bytes) else String(bytes,Charsets.UTF_8)
+                        if(raw.trimStart().startsWith("{"))store.importJson(raw)
+                        else if(Regex("(?i)[A-Z]{2}\d{9}[A-Z]{2}").containsMatchIn(raw)) importDeliveryText(raw,filename)
+                        else {
+                            val addresses=parseCsv(raw)
+                            require(addresses.isNotEmpty()){"Nenhum trecho ou objeto foi reconhecido no arquivo."}
+                            store.save(RouteDefinition(name=filename,addresses=addresses))
+                            refresh();Toast.makeText(this,"Roteiro importado.",Toast.LENGTH_SHORT).show()
+                        }
+                    }.onFailure{Toast.makeText(this,it.message?: "Não foi possível importar o arquivo.",Toast.LENGTH_LONG).show()}
                 }
-                refresh();Toast.makeText(this,"Roteiro importado.",Toast.LENGTH_SHORT).show()
-            }.onFailure{Toast.makeText(this,"Não foi possível importar. Use CSV ou arquivo .keyfast.",Toast.LENGTH_LONG).show()}
+            }
             saveFile->runCatching{
                 val route=exporting?:return
                 contentResolver.openOutputStream(uri)!!.bufferedWriter().use{it.write(store.exportJson(route))}
