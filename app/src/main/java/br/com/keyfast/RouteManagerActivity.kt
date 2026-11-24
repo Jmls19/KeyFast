@@ -364,7 +364,8 @@ class RouteManagerActivity:Activity() {
                     store.saveDailyDeliveries(route.id,matched)
                     store.setActive(route.id)
                     refresh()
-                    val matchedObjects=matched.sumOf { it.objectCodes.ifEmpty { listOfNotNull(it.objectCode.takeIf { code -> code.isNotBlank() }) }.distinct().size }\n                    Toast.makeText(this,"${matched.size} paradas (${matchedObjects} objetos) organizadas. $unmatched endereços sem correspondência.",Toast.LENGTH_LONG).show()
+                    val matchedObjects=matched.sumOf { it.objectCodes.ifEmpty { listOfNotNull(it.objectCode.takeIf { code -> code.isNotBlank() }) }.distinct().size }
+                    Toast.makeText(this,"${matched.size} paradas (${matchedObjects} objetos) organizadas. $unmatched endereços sem correspondência.",Toast.LENGTH_LONG).show()
                 }.onFailure { Toast.makeText(this,it.message?: "Não foi possível montar a sequência diária.",Toast.LENGTH_LONG).show() }
             }.show().also{styleDialog(it)}
     }
