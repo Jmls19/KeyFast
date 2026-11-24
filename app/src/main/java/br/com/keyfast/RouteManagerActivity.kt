@@ -194,6 +194,17 @@ class RouteManagerActivity:Activity() {
     }
 
     private fun editRoute(existing:RouteDefinition?) {
+        if(existing!=null && existing.addresses.any{it.objectCode.isNotBlank()}) {
+            val routeName=field("Nome do roteiro",existing.name)
+            AlertDialog.Builder(this).setTitle("Lista de objetos importada")
+                .setMessage("Esta lista contém objetos importados. A edição por trechos não se aplica a ela; você pode alterar o nome sem perder os códigos e a ordem.")
+                .setView(routeName).setNegativeButton("CANCELAR",null)
+                .setPositiveButton("SALVAR") { _,_ ->
+                    runCatching { store.save(existing.copy(name=routeName.text.toString().trim().ifBlank{existing.name}));refresh() }
+                        .onFailure { Toast.makeText(this,it.message?: "Não foi possível salvar o roteiro.",Toast.LENGTH_LONG).show() }
+                }.show().also { styleDialog(it) }
+            return
+        }
         expandedSegmentDetails=null
         val name=field("Nome do roteiro",existing?.name.orEmpty())
         val segments=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL}
@@ -241,7 +252,7 @@ class RouteManagerActivity:Activity() {
                     require(parsed.isNotEmpty())
                     store.save(RouteDefinition(existing?.id?:java.util.UUID.randomUUID().toString(),name.text.toString().trim(),parsed))
                     refresh()
-                }.onFailure{Toast.makeText(this,"Confira o nome e os campos dos trechos.",Toast.LENGTH_LONG).show()}
+                }.onFailure{Toast.makeText(this,it.message?: "Confira o nome e os campos dos trechos.",Toast.LENGTH_LONG).show()}
             }.show().also{styleDialog(it)}
     }
 
