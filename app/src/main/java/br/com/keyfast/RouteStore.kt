@@ -25,9 +25,9 @@ class RouteStore(context:android.content.Context) {
         val a=JSONArray(prefs.getString("routes","[]"))
         (0 until a.length()).map { i ->
             val o=a.getJSONObject(i); val aa=o.getJSONArray("addresses")
-            RouteDefinition(o.getString("id"),o.getString("name"),(0 until aa.length()).map { j ->
+            RouteDefinition(o.optString("id",UUID.randomUUID().toString()),o.optString("name","Roteiro"),(0 until aa.length()).map { j ->
                 val x=aa.getJSONObject(j)
-                RouteAddress(x.getString("id"),x.getString("street"),x.getString("number"),x.optInt("segment",1),x.optString("direction","CRESCENTE"),x.optBoolean("delivered",false),x.optString("cep",""),x.optString("objectCode",""),x.optString("parity","AMBOS"))
+                RouteAddress(x.optString("id",UUID.randomUUID().toString()),x.optString("street",""),x.optString("number",""),x.optInt("segment",1),x.optString("direction","CRESCENTE"),x.optBoolean("delivered",false),x.optString("cep",""),x.optString("objectCode",""),x.optString("parity","AMBOS"))
             })
         }
     }.getOrDefault(emptyList())
