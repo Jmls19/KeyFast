@@ -294,7 +294,12 @@ class RouteManagerActivity:Activity() {
         val active=store.activeId()
         val initial=routes.indexOfFirst{it.id==active}.let{if(it<0)routes.lastIndex else it}
         val picker=choiceSpinner(routes.map{it.name},routes[initial].name)
-        val examples=imported.take(3).joinToString("\n") { it.objectCode }
+        val examples=imported.take(3).joinToString("\\n") { it.objectCode }
+        val grouped=imported.groupBy { "${it.street}|${it.number}|${it.cep}" }
+        val addressSummary=grouped.entries.take(3).joinToString("\\n") { entry ->
+            val parts=entry.key.split("|")
+            "${parts.getOrElse(0){""}}, nº ${parts.getOrElse(1){""}} • CEP ${parts.getOrElse(2){""}} • ${entry.value.size} objetos"
+        }
         val panel=LinearLayout(this).apply {
             orientation=LinearLayout.VERTICAL
             setPadding(dp(18),dp(4),dp(18),0)
