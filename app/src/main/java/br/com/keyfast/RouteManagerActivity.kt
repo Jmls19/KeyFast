@@ -535,7 +535,11 @@ class RouteManagerActivity:Activity() {
                     else->runCatching{
                         val bytes=contentResolver.openInputStream(uri)!!.use{it.readBytes()}
                         val raw=if(bytes.size>=2&&bytes[0]==0x50.toByte()&&bytes[1]==0x4b.toByte())parseXlsx(bytes) else String(bytes,Charsets.UTF_8)
-                        if(raw.trimStart().startsWith("{"))store.importJson(raw)
+                        if(raw.trimStart().startsWith("{")) {
+                            val importedRoute=store.importJson(raw)
+                            refresh()
+                            Toast.makeText(this,"Roteiro \"${importedRoute.name}\" salvo com ${importedRoute.addresses.size} endereços.",Toast.LENGTH_LONG).show()
+                        }
                         else if(Regex("(?i)[A-Z]{2}\\d{9}[A-Z]{2}").containsMatchIn(raw)) importDeliveryText(raw,filename)
                         else {
                             val addresses=parseCsv(raw)
