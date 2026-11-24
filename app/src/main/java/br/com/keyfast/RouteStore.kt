@@ -46,7 +46,7 @@ class RouteStore(context:android.content.Context) {
     }
     fun saveDailyDeliveries(routeId:String,items:List<RouteAddress>) {
         val a=JSONArray()
-        items.forEach { x -> a.put(JSONObject().put("id",x.id).put("street",x.street).put("number",x.number).put("segment",x.segment).put("direction",x.direction).put("delivered",false).put("cep",x.cep).put("objectCode",x.objectCode).put("parity",x.parity)) }
+        items.forEach { x -> a.put(JSONObject().put("id",x.id).put("street",x.street).put("number",x.number).put("segment",x.segment).put("direction",x.direction).put("delivered",x.delivered).put("cep",x.cep).put("objectCode",x.objectCode).put("parity",x.parity)) }
         val payload=JSONObject().put("routeId",routeId).put("items",a).toString()
         check(prefs.edit().putString("daily_deliveries",payload).commit()) { "Não foi possível salvar a lista diária." }
     }
