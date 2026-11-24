@@ -51,7 +51,7 @@ class RouteWidgetService:Service() {
         root.addView(header)
         val pending=route.addresses.filter{!it.delivered}.take(3)
         pending.forEachIndexed{index,address->root.addView(addressRow(route,address,index+1,false))}
-        if(pending.isEmpty())root.addView(TextView(this).apply{text="Roteiro concluído!";setTextColor(Color.GREEN);setPadding(0,dp(12),0,dp(8))})
+        if(pending.isEmpty())root.addView(TextView(this).apply{text=if(route.addresses.isEmpty())"Nenhuma lista diária importada." else "Entregas do dia concluídas!";setTextColor(Color.GREEN);setPadding(0,dp(12),0,dp(8))})
         root.addView(TextView(this).apply{text="${route.addresses.count{it.delivered}} / ${route.addresses.size} entregues";textSize=10f;setTextColor(ink);gravity=Gravity.END})
         panel=root
         val params=WindowManager.LayoutParams(dp(330),WindowManager.LayoutParams.WRAP_CONTENT,WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,PixelFormat.TRANSLUCENT).apply{gravity=Gravity.TOP or Gravity.CENTER_HORIZONTAL;y=dp(28)}
