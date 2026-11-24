@@ -602,9 +602,28 @@ class KeyFastImeService:InputMethodService() {
  }
  private fun expand(item:RecipientShortcut){
   val ic=currentInputConnection?:return
-  ic.deleteSurroundingText(item.trigger.length,0);ic.commitText(item.recipientName,1)
-  val moved=ic.performEditorAction(EditorInfo.IME_ACTION_NEXT)
-  if(!moved){ic.sendKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN,KeyEvent.KEYCODE_TAB));ic.sendKeyEvent(KeyEvent(KeyEvent.ACTION_UP,KeyEvent.KEYCODE_TAB))}
-  currentInputConnection?.commitText(item.document,1);store.markUsed(item.id);refreshFromCursor()
+  ic.deleteSurroundingText(item.trigger.length,0)
+  ic.commitText(item.recipientName,1)
+  store.markUsed(item.id)
+  refreshFromCursor()
+
+  // Localiza o rótulo Documento/CPF/CNPJ e o campo editável correspondente.
+  // Não usa coordenadas fixas da tela nem envia o documento ao campo do nome.
+  Handler(Looper.getMainLooper()).postDelayed({
+   val accessibility=KeyFastAccessibilityService.instance
+   if(accessibility==null){
+    Toast.makeText(this,"Ative o serviço de Acessibilidade do KeyFast para preencher o documento.",Toast.LENGTH_LONG).show()
+    return@postDelayed
+   }
+   when(accessibility.locateAndFillDocument(item.document)){
+    KeyFastAccessibilityService.FillResult.FILLED -> refreshFromCursor()
+    KeyFastAccessibilityService.FillResult.FOCUSED -> Handler(Looper.getMainLooper()).postDelayed({
+     currentInputConnection?.commitText(item.document,1)
+     refreshFromCursor()
+    },250)
+    KeyFastAccessibilityService.FillResult.NOT_FOUND ->
+     Toast.makeText(this,"Campo Documento não localizado. O documento não foi inserido.",Toast.LENGTH_LONG).show()
+   }
+  },350)
  }
 }
