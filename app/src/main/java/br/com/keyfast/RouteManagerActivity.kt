@@ -573,7 +573,7 @@ class RouteManagerActivity:Activity() {
     private fun parseRecognizedObjects(raw:String):List<RouteAddress> {
         val lines=raw.lines().map { it.trim() }
         // Aceita separadores variáveis e confusões comuns do OCR (O/0, I/1, B/8).
-        val codeRegex=Regex("(?i)(?<![A-Z0-9])([A-Z0-9]{2})[\\\\s.\\\\-]*(\\\\d{3})[\\\\s.\\\\-]*(\\\\d{3})[\\\\s.\\\\-]*(\\\\d{3})[\\\\s.\\\\-]*([A-Z0-9]{2})(?![A-Z0-9])")
+        val codeRegex=Regex("(?i)(?<![A-Z0-9])([A-Z0-9]{2})[\\s.\\-]*(\\d{3})[\\s.\\-]*(\\d{3})[\\s.\\-]*(\\d{3})[\\s.\\-]*([A-Z0-9]{2})(?![A-Z0-9])")
         fun normalizeCode(hit:MatchResult):String {
             val letters=hit.groupValues[1].uppercase().replace('0','O').replace('1','I').replace('8','B').replace('5','S')
             val digits=(hit.groupValues[2]+hit.groupValues[3]+hit.groupValues[4]).uppercase()
@@ -589,7 +589,7 @@ class RouteManagerActivity:Activity() {
             val cepMatch=cepRegex.find(line) ?: return@forEachIndexed
             val block=lines.subList(blockStart,index+1)
             val codes=block.flatMap { row -> codeRegex.findAll(row).map { hit -> normalizeCode(hit) }.toList() }
-                .filter { it.matches(Regex("[A-Z]{2}\\\\d{9}[A-Z]{2}")) }.distinct()
+                .filter { it.matches(Regex("[A-Z]{2}\\d{9}[A-Z]{2}")) }.distinct()
             if(codes.isNotEmpty()) {
                 val addressLabelIndex=block.indexOfFirst { it.contains("Endereço",true) || it.contains("Endereco",true) }
                 val addressParts=mutableListOf<String>()
