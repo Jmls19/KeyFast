@@ -294,9 +294,9 @@ class RouteManagerActivity:Activity() {
         val active=store.activeId()
         val initial=routes.indexOfFirst{it.id==active}.let{if(it<0)routes.lastIndex else it}
         val picker=choiceSpinner(routes.map{it.name},routes[initial].name)
-        val examples=imported.take(3).joinToString("\\n") { it.objectCode }
+        val examples=imported.take(3).joinToString("\n") { it.objectCode }
         val grouped=imported.groupBy { "${it.street}|${it.number}|${it.cep}" }
-        val addressSummary=grouped.entries.take(3).joinToString("\\n") { entry ->
+        val addressSummary=grouped.entries.take(3).joinToString("\n") { entry ->
             val parts=entry.key.split("|")
             "${parts.getOrElse(0){""}}, nº ${parts.getOrElse(1){""}} • CEP ${parts.getOrElse(2){""}} • ${entry.value.size} objetos"
         }
@@ -304,7 +304,7 @@ class RouteManagerActivity:Activity() {
             orientation=LinearLayout.VERTICAL
             setPadding(dp(18),dp(4),dp(18),0)
             addView(TextView(this@RouteManagerActivity).apply {
-                text="${imported.size} objetos identificados\nExemplos:\n$examples\n\nSelecione o roteiro permanente para organizar as entregas."
+                text="${imported.size} objetos identificados\nEndereços extraídos:\n$addressSummary\n\nExemplos de códigos:\n$examples\n\nSelecione o roteiro permanente para organizar as entregas."
                 textSize=13f;setTextColor(ink)
             })
             addView(picker,LinearLayout.LayoutParams(-1,-2).apply{topMargin=dp(10)})
