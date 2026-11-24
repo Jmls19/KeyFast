@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="keyfast_accessibility_description">Localiza o campo Documento, CPF ou CNPJ no aplicativo em uso para preencher o documento associado ao atalho.</string>
+</resources>

@@ -1,6 +1,21 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW"/>
 <application android:allowBackup="false" android:icon="@drawable/keyfast_logo" android:roundIcon="@drawable/keyfast_logo" android:label="KeyFast" android:theme="@android:style/Theme.Material.NoActionBar">
+<activity android:name=".RouteManagerActivity" android:exported="false"/>
+<service android:name=".RouteWidgetService" android:exported="false"/>
 <activity android:name=".MainActivity" android:exported="true"><intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter></activity>
 <service android:name=".KeyFastImeService" android:label="KeyFast" android:permission="android.permission.BIND_INPUT_METHOD" android:exported="true">
 <intent-filter><action android:name="android.view.InputMethod"/></intent-filter><meta-data android:name="android.view.im" android:resource="@xml/method"/></service>
-</application></manifest>
+<service
+            android:name=".KeyFastAccessibilityService"
+            android:label="KeyFast – localizar campo Documento"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/keyfast_accessibility" />
+        </service>
+    </application></manifest>
