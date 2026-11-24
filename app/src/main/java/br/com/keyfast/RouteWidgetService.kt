@@ -36,7 +36,7 @@ class RouteWidgetService:Service() {
     private fun activeRoute():RouteDefinition? {
         val id=store.activeId()?:return null
         val route=store.routes().firstOrNull{it.id==id}?:return null
-        return store.applyRules(route)
+        return route.copy(addresses=store.dailyDeliveries(route.id))
     }
     private fun hide(){panel?.let{runCatching{wm.removeView(it)}};panel=null}
     private fun showWidget(){
@@ -74,7 +74,7 @@ class RouteWidgetService:Service() {
         layoutParams=LinearLayout.LayoutParams(dp(43),dp(40)).apply{leftMargin=dp(4)}
     }
     private fun confirm(route:RouteDefinition,address:RouteAddress){
-        store.updateAddress(route.id,address.id){it.copy(delivered=true)}
+        store.updateDailyAddress(route.id,address.id)
         refreshCurrent()
     }
     private fun saveRandomReference(route:RouteDefinition,address:RouteAddress){
