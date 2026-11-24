@@ -586,7 +586,7 @@ class RouteManagerActivity:Activity() {
                 val addressParts=mutableListOf<String>()
                 if(addressLabelIndex>=0) {
                     val labelLine=block[addressLabelIndex]
-                    val inline=labelLine.substringAfter(':',"").trim()
+                    val inline=labelLine.substringAfter(':',"").replace(cepRegex," ").replace(Regex("(?i)\\bCEP\\b.*$")," ").trim()
                     if(inline.isNotBlank()) addressParts.add(inline)
                     for(i in addressLabelIndex+1 until block.size) {
                         val candidate=block[i]
