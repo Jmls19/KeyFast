@@ -40,7 +40,9 @@ class RouteStore(context:android.content.Context) {
             r.addresses.forEach { x -> aa.put(JSONObject().put("id",x.id).put("street",x.street).put("number",x.number).put("segment",x.segment).put("direction",x.direction).put("delivered",x.delivered).put("cep",x.cep).put("objectCode",x.objectCode).put("parity",x.parity)) }
             a.put(JSONObject().put("id",r.id).put("name",r.name).put("addresses",aa))
         }
-        prefs.edit().putString("routes",a.toString()).apply()
+        val serialized=a.toString()
+        check(runCatching { JSONArray(serialized) }.isSuccess) { "Não foi possível validar os roteiros." }
+        check(prefs.edit().putString("routes",serialized).commit()) { "Não foi possível gravar os roteiros no armazenamento." }
     }
     fun activeId():String?=prefs.getString("active_route",null)
     fun setActive(id:String?) { prefs.edit().putString("active_route",id).apply() }
