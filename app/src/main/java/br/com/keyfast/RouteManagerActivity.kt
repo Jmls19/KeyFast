@@ -31,6 +31,7 @@ class RouteManagerActivity:Activity() {
     private fun action(label:String,primary:Boolean,onClick:()->Unit)=TextView(this).apply{text=label;gravity=Gravity.CENTER;textSize=12f;typeface=Typeface.create("sans-serif-medium",Typeface.NORMAL);setTextColor(if(primary)Color.WHITE else ink);background=surface(if(primary)blue else pale);isClickable=true;isFocusable=true;setPadding(dp(8),dp(10),dp(8),dp(10));setOnClickListener{onClick()}}
     private fun styleDialog(dialog:AlertDialog){dialog.window?.setBackgroundDrawable(surface(Color.rgb(250,252,255)));dialog.getButton(AlertDialog.BUTTON_POSITIVE)?.setTextColor(blue);dialog.getButton(AlertDialog.BUTTON_NEGATIVE)?.setTextColor(ink)}
     override fun onCreate(savedInstanceState:Bundle?) { super.onCreate(savedInstanceState);store=RouteStore(this);render() }
+    override fun onResume() { super.onResume(); if(::list.isInitialized) refresh() }
     private fun dp(v:Int)=(v*resources.displayMetrics.density+0.5f).toInt()
     private fun render() {
         window.statusBarColor=navy;window.navigationBarColor=navy
@@ -125,6 +126,7 @@ class RouteManagerActivity:Activity() {
     }
 
     private fun addSegment(container:LinearLayout, existing:List<RouteAddress> = emptyList(), expanded:Boolean=false):SegmentFields {
+        if(expanded) expandedSegmentDetails?.visibility=View.GONE
         val first=existing.firstOrNull()
         val nums=existing.mapNotNull{it.number.toIntOrNull()}
         val descending=first?.direction?.contains("DECRESC",true)==true
