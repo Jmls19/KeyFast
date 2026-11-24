@@ -62,7 +62,11 @@ class RouteWidgetService:Service() {
         val row=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER_VERTICAL;setPadding(dp(8),dp(5),dp(4),dp(5));background=bg(pale)}
         val label=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL}
         label.addView(TextView(this).apply{text=if(full)"${address.street}, ${address.number}" else "${address.street} ${address.number}";textSize=13f;setTextColor(ink);setTypeface(null,1);maxLines=2})
-        if(address.objectCode.isNotBlank())label.addView(TextView(this).apply{text="${address.objectCode} • CEP ${address.cep}";textSize=9f;setTextColor(blue)})
+        val codes=address.objectCodes.ifEmpty { listOfNotNull(address.objectCode.takeIf { it.isNotBlank() }) }.distinct()
+        if(codes.isNotEmpty()) {
+            label.addView(TextView(this).apply{text="${codes.size} objeto(s) • CEP ${address.cep}";textSize=9f;setTextColor(blue)})
+            label.addView(TextView(this).apply{text=codes.take(3).joinToString(" • ")+(if(codes.size>3)" • +${codes.size-3}" else "");textSize=9f;setTextColor(ink);maxLines=2})
+        }
         if(store.rules().any{it.street.equals(address.street,true)&&it.number==address.number})label.addView(TextView(this).apply{text="REFERÊNCIA SALVA";textSize=9f;setTextColor(blue)})
         row.addView(label,LinearLayout.LayoutParams(0,-2,1f))
         row.addView(actionButton("✅",Color.rgb(22,130,75),"Confirmar entrega"){confirm(route,address)})
