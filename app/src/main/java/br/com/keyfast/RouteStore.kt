@@ -13,7 +13,8 @@ data class RouteAddress(
     val delivered:Boolean=false,
     val cep:String="",
     val objectCode:String="",
-    val parity:String="AMBOS"
+    val parity:String="AMBOS",
+    val objectCodes:List<String> = emptyList()
 )
 data class RouteDefinition(val id:String=UUID.randomUUID().toString(),val name:String,val addresses:List<RouteAddress>)
 
@@ -27,7 +28,7 @@ class RouteStore(context:android.content.Context) {
             val o=a.getJSONObject(i); val aa=o.getJSONArray("addresses")
             RouteDefinition(o.optString("id",UUID.randomUUID().toString()),o.optString("name","Roteiro"),(0 until aa.length()).map { j ->
                 val x=aa.getJSONObject(j)
-                RouteAddress(x.optString("id",UUID.randomUUID().toString()),x.optString("street",""),x.optString("number",""),x.optInt("segment",1),x.optString("direction","CRESCENTE"),x.optBoolean("delivered",false),x.optString("cep",""),x.optString("objectCode",""),x.optString("parity","AMBOS"))
+                RouteAddress(x.optString("id",UUID.randomUUID().toString()),x.optString("street",""),x.optString("number",""),x.optInt("segment",1),x.optString("direction","CRESCENTE"),x.optBoolean("delivered",false),x.optString("cep",""),x.optString("objectCode",""),x.optString("parity","AMBOS"),(x.optJSONArray("objectCodes")?.let { codes -> (0 until codes.length()).map { codes.optString(it) }.filter { it.isNotBlank() } } ?: emptyList()))
             })
         }
     }.getOrDefault(emptyList())
@@ -37,7 +38,7 @@ class RouteStore(context:android.content.Context) {
         val a=JSONArray()
         items.forEach { r ->
             val aa=JSONArray()
-            r.addresses.forEach { x -> aa.put(JSONObject().put("id",x.id).put("street",x.street).put("number",x.number).put("segment",x.segment).put("direction",x.direction).put("delivered",x.delivered).put("cep",x.cep).put("objectCode",x.objectCode).put("parity",x.parity)) }
+            r.addresses.forEach { x -> aa.put(JSONObject().put("id",x.id).put("street",x.street).put("number",x.number).put("segment",x.segment).put("direction",x.direction).put("delivered",x.delivered).put("cep",x.cep).put("objectCode",x.objectCode).put("parity",x.parity).put("objectCodes",JSONArray((x.objectCodes.ifEmpty { listOfNotNull(x.objectCode.takeIf { it.isNotBlank() }) })))) }
             a.put(JSONObject().put("id",r.id).put("name",r.name).put("addresses",aa))
         }
         val serialized=a.toString()
@@ -46,7 +47,7 @@ class RouteStore(context:android.content.Context) {
     }
     fun saveDailyDeliveries(routeId:String,items:List<RouteAddress>) {
         val a=JSONArray()
-        items.forEach { x -> a.put(JSONObject().put("id",x.id).put("street",x.street).put("number",x.number).put("segment",x.segment).put("direction",x.direction).put("delivered",x.delivered).put("cep",x.cep).put("objectCode",x.objectCode).put("parity",x.parity)) }
+        items.forEach { x -> a.put(JSONObject().put("id",x.id).put("street",x.street).put("number",x.number).put("segment",x.segment).put("direction",x.direction).put("delivered",x.delivered).put("cep",x.cep).put("objectCode",x.objectCode).put("parity",x.parity).put("objectCodes",JSONArray((x.objectCodes.ifEmpty { listOfNotNull(x.objectCode.takeIf { it.isNotBlank() }) })))) }
         val payload=JSONObject().put("routeId",routeId).put("items",a).toString()
         check(prefs.edit().putString("daily_deliveries",payload).commit()) { "Não foi possível salvar a lista diária." }
     }
@@ -54,23 +55,43 @@ class RouteStore(context:android.content.Context) {
         val o=JSONObject(prefs.getString("daily_deliveries","{}"))
         if(o.optString("routeId")!=routeId) return@runCatching emptyList()
         val a=o.optJSONArray("items")?:JSONArray()
-        (0 until a.length()).map { i -> val x=a.getJSONObject(i); RouteAddress(x.optString("id",UUID.randomUUID().toString()),x.optString("street",""),x.optString("number",""),x.optInt("segment",1),x.optString("direction","CRESCENTE"),x.optBoolean("delivered",false),x.optString("cep",""),x.optString("objectCode",""),x.optString("parity","AMBOS")) }
+        (0 until a.length()).map { i -> val x=a.getJSONObject(i); RouteAddress(x.optString("id",UUID.randomUUID().toString()),x.optString("street",""),x.optString("number",""),x.optInt("segment",1),x.optString("direction","CRESCENTE"),x.optBoolean("delivered",false),x.optString("cep",""),x.optString("objectCode",""),x.optString("parity","AMBOS"),(x.optJSONArray("objectCodes")?.let { codes -> (0 until codes.length()).map { codes.optString(it) }.filter { it.isNotBlank() } } ?: emptyList())) }
     }.getOrDefault(emptyList())
+    private fun normalizeAddressPart(value:String)=value.lowercase().replace(Regex("[^\\p{L}\\p{N}]"),"")
+    private fun codesOf(item:RouteAddress):List<String> =
+        (item.objectCodes.ifEmpty { listOfNotNull(item.objectCode.takeIf { it.isNotBlank() }) })
+            .map { it.replace(Regex("[^A-Za-z0-9]"),"").uppercase() }.filter { it.matches(Regex("[A-Z]{2}\\d{9}[A-Z]{2}")) }.distinct()
+
     fun matchDailyDeliveries(route:RouteDefinition, imported:List<RouteAddress>):Pair<List<RouteAddress>,Int> {
         val ordered=applyRules(route).addresses
-        val matched=imported.mapNotNull { item ->
-            val normalizedStreet=item.street.lowercase().replace(Regex("[^\\p{L}\\p{N}]"),"")
+        val grouped=imported.groupBy {
+            "${normalizeAddressPart(it.street)}|${normalizeAddressPart(it.number)}|${it.cep.filter { c -> c.isDigit() }}"
+        }.values.map { group ->
+            val first=group.first()
+            val allCodes=group.flatMap { codesOf(it) }.distinct()
+            first.copy(objectCode=allCodes.firstOrNull().orEmpty(),objectCodes=allCodes,delivered=false)
+        }
+        val matched=grouped.mapNotNull { item ->
+            val streetKey=normalizeAddressPart(item.street)
+            val numberKey=normalizeAddressPart(item.number)
+            val cepKey=item.cep.filter { it.isDigit() }
+            if(streetKey.isBlank()) return@mapNotNull null
             val candidates=ordered.withIndex().filter { (_,saved) ->
-                val savedStreet=saved.street.lowercase().replace(Regex("[^\\p{L}\\p{N}]"),"")
-                val streetOk=normalizedStreet.isNotBlank() && (normalizedStreet==savedStreet || normalizedStreet.contains(savedStreet) || savedStreet.contains(normalizedStreet))
-                val cepOk=item.cep.isBlank() || saved.cep.isBlank() || saved.cep.filter{it.isDigit()}==item.cep.filter{it.isDigit()}
-                streetOk && cepOk
+                val streetOk=streetKey==normalizeAddressPart(saved.street)
+                val numberOk=if(numberKey.isBlank() || numberKey=="0") true else numberKey==normalizeAddressPart(saved.number)
+                val savedCep=saved.cep.filter { it.isDigit() }
+                val cepOk=cepKey.isBlank() || savedCep.isBlank() || cepKey==savedCep
+                streetOk && numberOk && cepOk
             }
-            val match=if(item.number.isBlank() || item.number=="0") candidates.singleOrNull() else candidates.firstOrNull{it.value.number.equals(item.number,true)}
+            val match=if(numberKey.isBlank() || numberKey=="0") candidates.singleOrNull() else candidates.firstOrNull()
             match ?: return@mapNotNull null
-            match.index to item.copy(street=match.value.street,number=match.value.number,segment=match.value.segment,direction=match.value.direction,delivered=false)
+            match.index to item.copy(
+                street=match.value.street,number=match.value.number,
+                segment=match.value.segment,direction=match.value.direction,
+                cep=match.value.cep.ifBlank { item.cep },delivered=false
+            )
         }.sortedBy { it.first }.map { it.second }
-        return matched to (imported.size-matched.size)
+        return matched to (grouped.size-matched.size)
     }
     fun updateDailyAddress(routeId:String,addressId:String) {
         val items=dailyDeliveries(routeId).map { if(it.id==addressId) it.copy(delivered=true) else it }
