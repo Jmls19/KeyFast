@@ -220,20 +220,28 @@ class RouteManagerActivity:Activity() {
             addView(add)
         }
         val scroll=ScrollView(this).apply{addView(content)}
-        AlertDialog.Builder(this)
+        val dialog=AlertDialog.Builder(this)
             .setTitle(if(existing==null)"Novo roteiro" else "Editar roteiro")
             .setView(scroll)
             .setNegativeButton("Cancelar",null)
-            .setPositiveButton("Salvar"){_,_->
+            .setPositiveButton("Salvar",null)
+            .create()
+        dialog.setOnShowListener {
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
                 runCatching {
-                    require(name.text.isNotBlank())
+                    require(name.text.toString().isNotBlank()) { "Informe o nome do roteiro." }
+                    val views=segmentsViews(segments)
+                    require(views.isNotEmpty() && views.size==segments.childCount) { "Confira os trechos adicionados." }
                     val parsed=mutableListOf<RouteAddress>()
-                    segmentsViews(segments).forEachIndexed{idx,s->
+                    views.forEachIndexed{idx,s->
                         val street=s.street.text.toString().trim()
-                        val first=s.initial.text.toString().toInt()
-                        val last=s.final.text.toString().toInt()
+                        val first=s.initial.text.toString().toIntOrNull()
+                            ?: throw IllegalArgumentException("Informe o número inicial do trecho ${idx+1}.")
+                        val last=s.final.text.toString().toIntOrNull()
+                            ?: throw IllegalArgumentException("Informe o número final do trecho ${idx+1}.")
                         val cepValue=s.cep.text.toString().trim()
-                        require(street.isNotBlank() && first>=0 && last>=0)
+                        require(street.isNotBlank()) { "Informe o logradouro do trecho ${idx+1}." }
+                        require(first>=0 && last>=0) { "Os números dos trechos não podem ser negativos." }
                         val descending=s.direction.selectedItem?.toString()=="Decrescente"
                         val parity=when(s.parity.selectedItem?.toString()){"Pares"->"PARES";"Ímpares"->"IMPARES";else->"AMBOS"}
                         val step=if(descending)-1 else 1
@@ -247,13 +255,25 @@ class RouteManagerActivity:Activity() {
                             if(n==stop)break
                             n+=step
                         }
-                        require(parsed.size>before){"O intervalo não contém números da paridade selecionada."}
+                        require(parsed.size>before) { "O intervalo do trecho ${idx+1} não contém números da paridade selecionada." }
                     }
-                    require(parsed.isNotEmpty())
-                    store.save(RouteDefinition(existing?.id?:java.util.UUID.randomUUID().toString(),name.text.toString().trim(),parsed))
+                    require(parsed.isNotEmpty()) { "Adicione ao menos um trecho válido." }
+                    val route=RouteDefinition(existing?.id?:java.util.UUID.randomUUID().toString(),name.text.toString().trim(),parsed)
+                    store.save(route)
+                    val persisted=store.routes().firstOrNull{it.id==route.id}
+                    check(persisted!=null && persisted.addresses.size==route.addresses.size) {
+                        "O roteiro não foi confirmado no armazenamento. Tente salvar novamente."
+                    }
                     refresh()
-                }.onFailure{Toast.makeText(this,it.message?: "Confira o nome e os campos dos trechos.",Toast.LENGTH_LONG).show()}
-            }.show().also{styleDialog(it)}
+                    Toast.makeText(this,"Roteiro salvo: ${route.name} (${route.addresses.size} endereços).",Toast.LENGTH_LONG).show()
+                    dialog.dismiss()
+                }.onFailure {
+                    Toast.makeText(this,it.message?: "Não foi possível salvar o roteiro.",Toast.LENGTH_LONG).show()
+                }
+            }
+        }
+        dialog.show()
+        styleDialog(dialog)
     }
 
     private fun segmentsViews(container:LinearLayout):List<SegmentFields> {
