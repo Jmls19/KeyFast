@@ -16,6 +16,7 @@ import android.os.ParcelFileDescriptor
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.util.Xml
+import android.provider.OpenableColumns
 import java.io.ByteArrayInputStream
 import java.util.zip.ZipInputStream
 import java.io.File
@@ -597,9 +598,21 @@ class RouteManagerActivity:Activity() {
     private fun processDailyFile(uri:Uri) {
         val mime=contentResolver.getType(uri).orEmpty().lowercase()
         val path=uri.lastPathSegment.orEmpty()
-        val extension=path.substringAfterLast('.', "").lowercase()
-        val filename=path.substringAfterLast(':').substringAfterLast('/').substringBeforeLast('.')
-            .ifBlank { "Lista de entregas" }
+        val displayName=runCatching {
+            contentResolver.query(uri,arrayOf(OpenableColumns.DISPLAY_NAME),null,null,null)?.use {
+                if(it.moveToFirst()) it.getString(0) else null
+            }
+        }.getOrNull().orEmpty().ifBlank { path.substringAfterLast(':').substringAfterLast('/') }
+        val extension=displayName.substringAfterLast('.', "").lowercase().ifBlank {
+            when(mime) {
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.document" -> "docx"
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" -> "xlsx"
+                "application/rtf","text/rtf" -> "rtf"
+                "text/html" -> "html"
+                else -> ""
+            }
+        }
+        val filename=displayName.substringBeforeLast('.').ifBlank { "Lista de entregas" }
         when {
             mime=="application/pdf" || extension=="pdf" -> recognizePdf(uri,filename)
             mime.startsWith("image/") || extension in listOf("jpg","jpeg","png","webp","heic") -> recognizeImage(uri,filename)
