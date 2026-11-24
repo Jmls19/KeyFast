@@ -283,18 +283,40 @@ class RouteManagerActivity:Activity() {
     private fun isTrackingCode(value:String)=Regex("^[A-Z]{2}\\d{9}[A-Z]{2}$").matches(value.trim().uppercase())
     private fun importDeliveryText(raw:String, suggestedName:String) {
         runCatching {
-            val addresses=parseDeliveryList(raw)
-            require(addresses.isNotEmpty()) { "Nenhuma linha de entrega reconhecida." }
-            val name=EditText(this).apply{setText(suggestedName);hint="Nome do roteiro";setSingleLine()}
-            AlertDialog.Builder(this).setTitle("Nomear roteiro").setView(name)
-                .setNegativeButton("Cancelar",null)
-                .setPositiveButton("Salvar"){_,_->
-                    val title=name.text.toString().trim().ifBlank{suggestedName}
-                    store.save(RouteDefinition(name=title,addresses=addresses))
-                    refresh()
-                    Toast.makeText(this,"\${addresses.size} entregas importadas.",Toast.LENGTH_LONG).show()
-                }.show().also{styleDialog(it)}
+            val addresses=parseDeliveryList(raw).ifEmpty { parseRecognizedObjects(raw) }
+            require(addresses.isNotEmpty()) { "Nenhum objeto no padrão AA123456789BB foi reconhecido." }
+            importDailyList(addresses,suggestedName)
         }.onFailure { Toast.makeText(this,it.message?: "Não foi possível reconhecer a lista.",Toast.LENGTH_LONG).show() }
+    }
+    private fun importDailyList(imported:List<RouteAddress>,sourceName:String) {
+        val routes=store.routes()
+        require(routes.isNotEmpty()) { "Cadastre primeiro o roteiro permanente antes de importar a lista diária." }
+        val active=store.activeId()
+        val initial=routes.indexOfFirst{it.id==active}.let{if(it<0)routes.lastIndex else it}
+        val picker=choiceSpinner(routes.map{it.name},routes[initial].name)
+        val examples=imported.take(3).joinToString("\n") { it.objectCode }
+        val panel=LinearLayout(this).apply {
+            orientation=LinearLayout.VERTICAL
+            setPadding(dp(18),dp(4),dp(18),0)
+            addView(TextView(this@RouteManagerActivity).apply {
+                text="${imported.size} objetos identificados\nExemplos:\n$examples\n\nSelecione o roteiro permanente para organizar as entregas."
+                textSize=13f;setTextColor(ink)
+            })
+            addView(picker,LinearLayout.LayoutParams(-1,-2).apply{topMargin=dp(10)})
+        }
+        AlertDialog.Builder(this).setTitle("Lista diária • $sourceName").setView(panel)
+            .setNegativeButton("CANCELAR",null)
+            .setPositiveButton("CRUZAR COM ROTEIRO") { _,_ ->
+                val route=routes[picker.selectedItemPosition.coerceIn(0,routes.lastIndex)]
+                runCatching {
+                    val (matched,unmatched)=store.matchDailyDeliveries(route,imported)
+                    require(matched.isNotEmpty()) { "Nenhum endereço da lista corresponde ao roteiro selecionado. O roteiro permanente não foi alterado." }
+                    store.saveDailyDeliveries(route.id,matched)
+                    store.setActive(route.id)
+                    refresh()
+                    Toast.makeText(this,"${matched.size} entregas organizadas no roteiro. $unmatched sem correspondência.",Toast.LENGTH_LONG).show()
+                }.onFailure { Toast.makeText(this,it.message?: "Não foi possível montar a sequência diária.",Toast.LENGTH_LONG).show() }
+            }.show().also{styleDialog(it)}
     }
     private fun parseDeliveryList(raw:String):List<RouteAddress> {
         val result=mutableListOf<Pair<Int,RouteAddress>>()
@@ -457,28 +479,14 @@ class RouteManagerActivity:Activity() {
 
     private fun showOcrReview(raw:String,name:String) {
         if(raw.isBlank()) { Toast.makeText(this,"Nenhum texto foi reconhecido no documento.",Toast.LENGTH_LONG).show();return }
-        val input=EditText(this).apply { setText(raw);minLines=10;gravity=Gravity.TOP;setTextIsSelectable(true) }
-        val scroll=ScrollView(this).apply { addView(input) }
-        AlertDialog.Builder(this).setTitle("Conferir texto reconhecido")
-            .setMessage("Confira o texto extraído. Você pode corrigir antes de importar os códigos e endereços.")
-            .setView(scroll).setNegativeButton("Cancelar",null)
-            .setPositiveButton("RECONHECER OBJETOS") { _,_ -> importRecognizedText(input.text.toString(),name) }
-            .show().also { styleDialog(it) }
+        importRecognizedText(raw,name)
     }
 
     private fun importRecognizedText(raw:String,name:String) {
         runCatching {
             val addresses=parseRecognizedObjects(raw)
             require(addresses.isNotEmpty()) { "Nenhum código de objeto dos Correios foi reconhecido." }
-            val routeName=EditText(this).apply { setText(name);hint="Nome do roteiro";setSingleLine() }
-            AlertDialog.Builder(this).setTitle("\${addresses.size} objetos reconhecidos").setMessage("Confirme o nome para salvar a lista.")
-                .setView(routeName).setNegativeButton("CANCELAR",null)
-                .setPositiveButton("SALVAR LISTA") { _,_ ->
-                    val title=routeName.text.toString().trim().ifBlank { name }
-                    store.save(RouteDefinition(name=title,addresses=addresses))
-                    refresh()
-                    Toast.makeText(this,"\${addresses.size} objetos importados.",Toast.LENGTH_LONG).show()
-                }.show().also { styleDialog(it) }
+            importDailyList(addresses,name)
         }.onFailure { Toast.makeText(this,it.message?: "Não foi possível reconhecer os objetos.",Toast.LENGTH_LONG).show() }
     }
 
