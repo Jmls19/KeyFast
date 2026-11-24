@@ -62,12 +62,12 @@ class RouteStore(context:android.content.Context) {
             val normalizedStreet=item.street.lowercase().replace(Regex("[^\\p{L}\\p{N}]"),"")
             val candidates=ordered.withIndex().filter { (_,saved) ->
                 val savedStreet=saved.street.lowercase().replace(Regex("[^\\p{L}\\p{N}]"),"")
-                val streetOk=normalizedStreet.isBlank() || normalizedStreet==savedStreet || normalizedStreet.contains(savedStreet) || savedStreet.contains(normalizedStreet)
-                val numberOk=item.number.isBlank() || item.number=="0" || saved.number.equals(item.number,true)
+                val streetOk=normalizedStreet.isNotBlank() && (normalizedStreet==savedStreet || normalizedStreet.contains(savedStreet) || savedStreet.contains(normalizedStreet))
                 val cepOk=item.cep.isBlank() || saved.cep.isBlank() || saved.cep.filter{it.isDigit()}==item.cep.filter{it.isDigit()}
-                streetOk && numberOk && cepOk
+                streetOk && cepOk
             }
-            val match=candidates.firstOrNull() ?: return@mapNotNull null
+            val match=if(item.number.isBlank() || item.number=="0") candidates.singleOrNull() else candidates.firstOrNull{it.value.number.equals(item.number,true)}
+            match ?: return@mapNotNull null
             match.index to item.copy(street=match.value.street,number=match.value.number,segment=match.value.segment,direction=match.value.direction,delivered=false)
         }.sortedBy { it.first }.map { it.second }
         return matched to (imported.size-matched.size)
