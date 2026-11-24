@@ -495,10 +495,10 @@ class RouteManagerActivity:Activity() {
             val cleaned=chunk.replace(codeRegex," ").replace(Regex("(?i)\\b(CEP|OBJETO|ORDEM|ENDEREÇO)\\b")," ")
             val cep=Regex("\\b\\d{5}-?\\d{3}\\b").find(cleaned)?.value.orEmpty()
             val withoutCep=cleaned.replace(Regex("\\b\\d{5}-?\\d{3}\\b")," ")
-            val normalized=withoutCep.replace(Regex("[|;•]+")," ").replace(Regex("\\s+")," ").trim(" -,:")
+            val normalized=withoutCep.replace(Regex("[|;•]+")," ").replace(Regex("\\s+")," ").trim(' ', '-', ',', ':')
             val numberMatch=Regex("(?:,|\\s)(\\d+[A-Za-z]?)$").find(normalized)
             val house=numberMatch?.groupValues?.get(1) ?: "0"
-            val street=if(numberMatch!=null)normalized.removeRange(numberMatch.range).trim(" -,:") else normalized
+            val street=if(numberMatch!=null)normalized.removeRange(numberMatch.range).trim(' ', '-', ',', ':') else normalized
             result.add(RouteAddress(street=street.ifBlank { "Endereço a conferir" },number=house,segment=1,direction="LISTA IMPORTADA",cep=cep,objectCode=code))
         }
         return result.distinctBy { it.objectCode }
