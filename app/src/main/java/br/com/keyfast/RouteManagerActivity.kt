@@ -28,6 +28,7 @@ class RouteManagerActivity:Activity() {
     private lateinit var list:LinearLayout
     private val openFile=4101
     private val saveFile=4102
+    private val openDailyFile=4103
     private var exporting:RouteDefinition?=null
     private var expandedSegmentDetails:LinearLayout?=null
     private val textRecognizer by lazy { TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS) }
@@ -46,7 +47,8 @@ class RouteManagerActivity:Activity() {
         val root=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setPadding(dp(18),dp(20),dp(18),dp(16));background=GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,intArrayOf(navy,Color.rgb(5,17,39)))}
         root.addView(TextView(this).apply{text="ROTEIROS";textSize=25f;typeface=Typeface.create("sans-serif-medium",Typeface.NORMAL);setTextColor(Color.WHITE);setPadding(dp(2),0,0,dp(14))})
         root.addView(action("▣  IMPORTAR ROTEIRO POR ARQUIVO",true){val i=Intent(Intent.ACTION_OPEN_DOCUMENT).apply{addCategory(Intent.CATEGORY_OPENABLE);type="*/*";putExtra(Intent.EXTRA_MIME_TYPES,arrayOf("text/csv","text/plain","application/json","application/octet-stream","application/pdf","image/*","application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))};startActivityForResult(i,openFile)},LinearLayout.LayoutParams(-1,dp(50)).apply{bottomMargin=dp(9)})
-        root.addView(action("☷  IMPORTAR LISTA DE ENTREGAS (SRO)",false){pasteDeliveryList()},LinearLayout.LayoutParams(-1,dp(50)).apply{bottomMargin=dp(9)})
+        root.addView(action("☷  IMPORTAR LISTA DE ENTREGAS",false){openDailyFilePicker()},LinearLayout.LayoutParams(-1,dp(50)).apply{bottomMargin=dp(9)})
+        root.addView(action("▤  COLAR LISTA DO SRO",false){pasteDeliveryList()},LinearLayout.LayoutParams(-1,dp(44)).apply{bottomMargin=dp(9)})
         root.addView(action("+  CRIAR ROTEIRO",true){editRoute(null)},LinearLayout.LayoutParams(-1,dp(50)).apply{bottomMargin=dp(16)})
         val scroll=ScrollView(this);list=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL};scroll.addView(list);root.addView(scroll,LinearLayout.LayoutParams(-1,0,1f))
         setContentView(root);refresh()
@@ -291,6 +293,27 @@ class RouteManagerActivity:Activity() {
         }
     }
 
+    private fun openDailyFilePicker() {
+        val types=arrayOf(
+            "application/pdf","text/plain","text/csv","text/tab-separated-values",
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            "application/msword",
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            "application/vnd.ms-excel","application/rtf","text/rtf",
+            "application/vnd.oasis.opendocument.text","application/vnd.oasis.opendocument.spreadsheet","image/*"
+        )
+        val intent=Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+            addCategory(Intent.CATEGORY_OPENABLE)
+            type="*/*"
+            putExtra(Intent.EXTRA_MIME_TYPES,types)
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+        try { startActivityForResult(intent,openDailyFile) }
+        catch(_:android.content.ActivityNotFoundException) {
+            Toast.makeText(this,"Nenhum gerenciador de arquivos disponível para abrir documentos.",Toast.LENGTH_LONG).show()
+        }
+    }
+
     private fun pasteDeliveryList() {
         val input=EditText(this).apply { hint="Cole aqui as linhas copiadas do SRO Web"; minLines=8; gravity=Gravity.TOP }
         val scroll=ScrollView(this).apply{addView(input)}
@@ -461,6 +484,35 @@ class RouteManagerActivity:Activity() {
         }
         return rows.joinToString("\n"){r->(0..(r.keys.maxOrNull()?:0)).joinToString(";"){i->r[i].orEmpty().replace(";"," ")}}
     }
+    private fun parseDocx(bytes:ByteArray):String {
+        val document=ZipInputStream(ByteArrayInputStream(bytes)).use { zip ->
+            var found:ByteArray?=null
+            while(true) {
+                val entry=zip.nextEntry?:break
+                if(entry.name=="word/document.xml") found=zip.readBytes()
+                zip.closeEntry()
+                if(found!=null) break
+            }
+            found
+        } ?: throw IllegalArgumentException("Documento Word inválido ou sem texto.")
+        return String(document,Charsets.UTF_8)
+            .replace(Regex("<w:tab[^>]*/>"),"\t")
+            .replace(Regex("</w:p>"),"\n")
+            .replace(Regex("<[^>]+>")," ")
+            .replace("&amp;","&").replace("&lt;","<").replace("&gt;",">")
+            .replace(Regex("\\s+")," ").trim()
+    }
+
+    private fun normalizeDocumentText(raw:String,extension:String):String = when(extension) {
+        "rtf" -> raw.replace(Regex("\\\\[a-zA-Z]+-?\\d* ?")," ")
+            .replace(Regex("[{}]")," ").replace(Regex("\\s+")," ")
+        "html","htm" -> raw.replace(Regex("(?is)<script[^>]*>.*?</script>")," ")
+            .replace(Regex("(?is)<style[^>]*>.*?</style>")," ")
+            .replace(Regex("<[^>]+>")," ").replace("&nbsp;"," ").replace("&amp;","&")
+            .replace(Regex("\\s+")," ")
+        else -> raw
+    }
+
     private fun recognizeImage(uri:Uri,name:String) {
         val progress=AlertDialog.Builder(this).setTitle("Reconhecendo lista").setMessage("Lendo o texto da imagem...").setCancelable(false).create()
         progress.show()
@@ -542,10 +594,42 @@ class RouteManagerActivity:Activity() {
         val i=Intent(Intent.ACTION_CREATE_DOCUMENT).apply{addCategory(Intent.CATEGORY_OPENABLE);type="application/json";putExtra(Intent.EXTRA_TITLE,route.name.replace(Regex("[^A-Za-z0-9_-]"),"_")+".keyfast")}
         startActivityForResult(i,saveFile)
     }
+    private fun processDailyFile(uri:Uri) {
+        val mime=contentResolver.getType(uri).orEmpty().lowercase()
+        val path=uri.lastPathSegment.orEmpty()
+        val extension=path.substringAfterLast('.', "").lowercase()
+        val filename=path.substringAfterLast(':').substringAfterLast('/').substringBeforeLast('.')
+            .ifBlank { "Lista de entregas" }
+        when {
+            mime=="application/pdf" || extension=="pdf" -> recognizePdf(uri,filename)
+            mime.startsWith("image/") || extension in listOf("jpg","jpeg","png","webp","heic") -> recognizeImage(uri,filename)
+            extension=="doc" || mime=="application/msword" ->
+                Toast.makeText(this,"Formato Word antigo (.doc) não é compatível. Salve o documento como .docx e tente novamente.",Toast.LENGTH_LONG).show()
+            extension=="xls" || mime=="application/vnd.ms-excel" ->
+                Toast.makeText(this,"Formato Excel antigo (.xls) não é compatível. Salve a planilha como .xlsx e tente novamente.",Toast.LENGTH_LONG).show()
+            else -> runCatching {
+                val bytes=contentResolver.openInputStream(uri)?.use { it.readBytes() }
+                    ?: throw IllegalArgumentException("Não foi possível abrir o arquivo selecionado.")
+                val raw=when {
+                    extension=="docx" -> parseDocx(bytes)
+                    extension=="xlsx" -> parseXlsx(bytes)
+                    bytes.size>=2 && bytes[0]==0x50.toByte() && bytes[1]==0x4b.toByte() ->
+                        throw IllegalArgumentException("Arquivo compactado não reconhecido. Use PDF, TXT, CSV, DOCX ou XLSX.")
+                    else -> normalizeDocumentText(String(bytes,Charsets.UTF_8),extension)
+                }
+                require(raw.isNotBlank()) { "O arquivo está vazio ou não contém texto legível." }
+                importDeliveryText(raw,filename)
+            }.onFailure {
+                Toast.makeText(this,it.message?: "Não foi possível ler a lista selecionada.",Toast.LENGTH_LONG).show()
+            }
+        }
+    }
+
     override fun onActivityResult(requestCode:Int,resultCode:Int,data:Intent?) {
         super.onActivityResult(requestCode,resultCode,data);if(resultCode!=RESULT_OK||data?.data==null)return
         val uri=data.data!!
         when(requestCode){
+            openDailyFile->{processDailyFile(uri)}
             openFile->{
                 val mime=contentResolver.getType(uri).orEmpty().lowercase()
                 val filename=uri.lastPathSegment?.substringAfterLast(':')?.substringAfterLast('/')?.substringBeforeLast('.')?.ifBlank{"Lista importada"}?:"Lista importada"
