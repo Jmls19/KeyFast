@@ -22,6 +22,7 @@ class RouteManagerActivity:Activity() {
     private val openFile=4101
     private val saveFile=4102
     private var exporting:RouteDefinition?=null
+    private var expandedSegmentDetails:LinearLayout?=null
     private val navy=Color.rgb(7,23,50)
     private val blue=Color.rgb(18,99,217)
     private val pale=Color.rgb(225,237,255)
@@ -47,12 +48,17 @@ class RouteManagerActivity:Activity() {
             val card=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setPadding(dp(14),dp(12),dp(14),dp(12));background=surface(Color.rgb(250,252,255));elevation=dp(3).toFloat()}
             card.addView(TextView(this).apply{text=route.name;textSize=18f;setTextColor(ink)})
             card.addView(TextView(this).apply{text="${route.addresses.size} endereços • ${route.addresses.count{it.delivered}} entregues";textSize=12f;setTextColor(Color.rgb(92,110,138))})
+            val editButton=action("EDITAR ROTEIRO",true){editRoute(route)}
+            card.addView(editButton,LinearLayout.LayoutParams(-1,dp(42)).apply{topMargin=dp(8)})
             val actions=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL}
-            actions.addView(action("ABRIR",true){startRoute(route)})
-            actions.addView(action("EDITAR",false){editRoute(route)})
-            actions.addView(action("COMPARTILHAR",false){exportRoute(route)})
-            actions.addView(action("EXCLUIR",false){AlertDialog.Builder(this@RouteManagerActivity).setTitle("Excluir roteiro?").setMessage("Excluir ${route.name}?").setNegativeButton("CANCELAR",null).setPositiveButton("EXCLUIR"){_,_->store.delete(route.id);refresh()}.show().also{styleDialog(it)}})
-            card.addView(actions);list.addView(card,LinearLayout.LayoutParams(-1,-2).apply{bottomMargin=dp(10)})
+            val open=action("ABRIR",false){startRoute(route)}
+            val share=action("COMPARTILHAR",false){exportRoute(route)}
+            val delete=action("EXCLUIR",false){AlertDialog.Builder(this@RouteManagerActivity).setTitle("Excluir roteiro?").setMessage("Excluir ${route.name}?").setNegativeButton("CANCELAR",null).setPositiveButton("EXCLUIR"){_,_->store.delete(route.id);refresh()}.show().also{styleDialog(it)}}
+            actions.addView(open,LinearLayout.LayoutParams(0,dp(40),1f).apply{rightMargin=dp(4)})
+            actions.addView(share,LinearLayout.LayoutParams(0,dp(40),1f).apply{leftMargin=dp(4);rightMargin=dp(4)})
+            actions.addView(delete,LinearLayout.LayoutParams(0,dp(40),1f).apply{leftMargin=dp(4)})
+            card.addView(actions,LinearLayout.LayoutParams(-1,-2).apply{topMargin=dp(6)})
+            list.addView(card,LinearLayout.LayoutParams(-1,-2).apply{bottomMargin=dp(10)})
         }
         if(store.routes().isEmpty())list.addView(TextView(this).apply{text="Nenhum roteiro cadastrado.";setTextColor(Color.rgb(220,232,250));setPadding(0,dp(20),0,0)})
     }
@@ -100,7 +106,25 @@ class RouteManagerActivity:Activity() {
         return spinner
     }
 
-    private fun addSegment(container:LinearLayout, existing:List<RouteAddress> = emptyList()):SegmentFields {
+    private fun renumberSegments(container:LinearLayout) {
+        for(i in 0 until container.childCount) {
+            val card=container.getChildAt(i) as? LinearLayout ?: continue
+            val header=card.getChildAt(0) as? LinearLayout ?: continue
+            (header.getChildAt(0) as? TextView)?.text="TRECHO ${i+1}"
+        }
+    }
+
+    private fun moveSegment(container:LinearLayout,card:LinearLayout,delta:Int) {
+        val from=container.indexOfChild(card)
+        val to=from+delta
+        if(from<0||to !in 0 until container.childCount) return
+        val params=card.layoutParams
+        container.removeViewAt(from)
+        container.addView(card,to,params)
+        renumberSegments(container)
+    }
+
+    private fun addSegment(container:LinearLayout, existing:List<RouteAddress> = emptyList(), expanded:Boolean=false):SegmentFields {
         val first=existing.firstOrNull()
         val nums=existing.mapNotNull{it.number.toIntOrNull()}
         val descending=first?.direction?.contains("DECRESC",true)==true
@@ -109,12 +133,32 @@ class RouteManagerActivity:Activity() {
             setPadding(dp(10),dp(8),dp(10),dp(10))
             background=surface(Color.rgb(250,252,255))
         }
+        val header=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER_VERTICAL}
         val heading=TextView(this).apply {
             text="TRECHO ${container.childCount+1}"
-            textSize=12f
+            textSize=13f
+            typeface=Typeface.create("sans-serif-medium",Typeface.NORMAL)
             setTextColor(blue)
-            setPadding(0,0,0,dp(4))
+            setPadding(dp(2),dp(8),dp(4),dp(8))
+            isClickable=true
+            setOnClickListener {
+                val details=card.getChildAt(1)
+                if(details.visibility==View.VISIBLE) {
+                    details.visibility=View.GONE
+                    if(expandedSegmentDetails===details) expandedSegmentDetails=null
+                } else {
+                    expandedSegmentDetails?.visibility=View.GONE
+                    details.visibility=View.VISIBLE
+                    expandedSegmentDetails=details as LinearLayout
+                }
+            }
         }
+        val up=action("↑",false){moveSegment(container,card,-1)}
+        val down=action("↓",false){moveSegment(container,card,1)}
+        header.addView(heading,LinearLayout.LayoutParams(0,dp(38),1f))
+        header.addView(up,LinearLayout.LayoutParams(dp(42),dp(36)).apply{rightMargin=dp(4)})
+        header.addView(down,LinearLayout.LayoutParams(dp(42),dp(36)))
+        val details=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;visibility=if(expanded)View.VISIBLE else View.GONE}
         val cep=field("CEP",first?.cep.orEmpty())
         val street=field("Logradouro",first?.street.orEmpty())
         val initial=field("N. Inicial",if(nums.isEmpty())"" else if(descending)nums.max().toString() else nums.min().toString(),true)
@@ -122,34 +166,35 @@ class RouteManagerActivity:Activity() {
         val direction=choiceSpinner(listOf("Crescente","Decrescente"),if(descending)"Decrescente" else "Crescente")
         val parityValue=first?.parity?.uppercase()?.takeIf{it in listOf("PARES","IMPARES","AMBOS")}?:"AMBOS"
         val parity=choiceSpinner(listOf("Ambos","Pares","Ímpares"),when(parityValue){"PARES"->"Pares";"IMPARES"->"Ímpares";else->"Ambos"})
-        card.addView(heading)
-        card.addView(cep,LinearLayout.LayoutParams(-1,-2))
-        card.addView(street,LinearLayout.LayoutParams(-1,-2))
+        details.addView(cep,LinearLayout.LayoutParams(-1,-2))
+        details.addView(street,LinearLayout.LayoutParams(-1,-2))
         val numbers=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL}
         numbers.addView(initial,LinearLayout.LayoutParams(0,-2,1f).apply{rightMargin=dp(5)})
         numbers.addView(final,LinearLayout.LayoutParams(0,-2,1f).apply{leftMargin=dp(5)})
-        card.addView(numbers)
-        val directionLabel=TextView(this).apply{text="Sentido";textSize=12f;setTextColor(ink);setPadding(dp(2),dp(4),0,0)}
-        card.addView(directionLabel)
-        card.addView(direction,LinearLayout.LayoutParams(-1,-2))
-        val parityLabel=TextView(this).apply{text="Numeração";textSize=12f;setTextColor(ink);setPadding(dp(2),dp(7),0,0)}
-        card.addView(parityLabel)
-        card.addView(parity,LinearLayout.LayoutParams(-1,-2))
-        container.addView(card,LinearLayout.LayoutParams(-1,-2).apply{bottomMargin=dp(10)})
+        details.addView(numbers)
+        details.addView(TextView(this).apply{text="Sentido";textSize=12f;setTextColor(ink);setPadding(dp(2),dp(4),0,0)})
+        details.addView(direction,LinearLayout.LayoutParams(-1,-2))
+        details.addView(TextView(this).apply{text="Numeração";textSize=12f;setTextColor(ink);setPadding(dp(2),dp(7),0,0)})
+        details.addView(parity,LinearLayout.LayoutParams(-1,-2))
+        card.addView(header)
+        card.addView(details)
+        container.addView(card,LinearLayout.LayoutParams(-1,-2).apply{bottomMargin=dp(8)})
+        if(expanded) expandedSegmentDetails=details
         return SegmentFields(cep,street,initial,final,direction,parity,card)
     }
 
     private fun editRoute(existing:RouteDefinition?) {
+        expandedSegmentDetails=null
         val name=field("Nome do roteiro",existing?.name.orEmpty())
         val segments=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL}
         val grouped=existing?.addresses?.groupBy{it.segment}?.toSortedMap()?.values?.toList().orEmpty()
-        if(grouped.isEmpty()) addSegment(segments) else grouped.forEach{addSegment(segments,it)}
-        val add=action("+  ADICIONAR TRECHO",false){addSegment(segments)}
+        if(grouped.isEmpty()) addSegment(segments,expanded=true) else grouped.forEachIndexed{index,items->addSegment(segments,items,expanded=index==0)}
+        val add=action("+  ADICIONAR TRECHO",false){addSegment(segments,expanded=true)}
         val content=LinearLayout(this).apply{
             orientation=LinearLayout.VERTICAL
             setPadding(dp(8),0,dp(8),0)
             addView(name)
-            addView(TextView(this@RouteManagerActivity).apply{text="Dados de cada trecho";textSize=14f;setTextColor(ink);setPadding(0,dp(8),0,dp(6))})
+            addView(TextView(this@RouteManagerActivity).apply{text="Trechos do roteiro — toque para editar e use as setas para mudar a ordem";textSize=13f;setTextColor(ink);setPadding(0,dp(8),0,dp(6))})
             addView(segments)
             addView(add)
         }
@@ -191,16 +236,16 @@ class RouteManagerActivity:Activity() {
     }
 
     private fun segmentsViews(container:LinearLayout):List<SegmentFields> {
-        // The five input widgets are kept in each segment card in a fixed order.
         return (0 until container.childCount).mapNotNull { index ->
             val card=container.getChildAt(index) as? LinearLayout ?: return@mapNotNull null
-            val cep=card.getChildAt(1) as? EditText ?: return@mapNotNull null
-            val street=card.getChildAt(2) as? EditText ?: return@mapNotNull null
-            val numbers=card.getChildAt(3) as? LinearLayout ?: return@mapNotNull null
+            val details=card.getChildAt(1) as? LinearLayout ?: return@mapNotNull null
+            val cep=details.getChildAt(0) as? EditText ?: return@mapNotNull null
+            val street=details.getChildAt(1) as? EditText ?: return@mapNotNull null
+            val numbers=details.getChildAt(2) as? LinearLayout ?: return@mapNotNull null
             val initial=numbers.getChildAt(0) as? EditText ?: return@mapNotNull null
             val final=numbers.getChildAt(1) as? EditText ?: return@mapNotNull null
-            val direction=card.getChildAt(5) as? Spinner ?: return@mapNotNull null
-            val parity=card.getChildAt(7) as? Spinner ?: return@mapNotNull null
+            val direction=details.getChildAt(4) as? Spinner ?: return@mapNotNull null
+            val parity=details.getChildAt(6) as? Spinner ?: return@mapNotNull null
             SegmentFields(cep,street,initial,final,direction,parity,card)
         }
     }
