@@ -338,17 +338,18 @@ class RouteManagerActivity:Activity() {
         val active=store.activeId()
         val initial=routes.indexOfFirst{it.id==active}.let{if(it<0)routes.lastIndex else it}
         val picker=choiceSpinner(routes.map{it.name},routes[initial].name)
-        val examples=imported.take(3).joinToString("\n") { it.objectCode }
-        val grouped=imported.groupBy { "${it.street}|${it.number}|${it.cep}" }
+        val objectCodes=imported.flatMap { it.objectCodes.ifEmpty { listOfNotNull(it.objectCode.takeIf { code -> code.isNotBlank() }) } }.distinct()
+        val examples=objectCodes.take(3).joinToString("\n")
+        val grouped=imported.groupBy { "${it.street.lowercase().replace(Regex("[^\\p{L}\\p{N}]"),"")}|${it.number}|${it.cep.filter { c -> c.isDigit() }}" }
         val addressSummary=grouped.entries.take(3).joinToString("\n") { entry ->
-            val parts=entry.key.split("|")
-            "${parts.getOrElse(0){""}}, nº ${parts.getOrElse(1){""}} • CEP ${parts.getOrElse(2){""}} • ${entry.value.size} objetos"
+            val first=entry.value.first()
+            "${first.street}, nº ${first.number} • CEP ${first.cep} • ${entry.value.flatMap { it.objectCodes.ifEmpty { listOfNotNull(it.objectCode.takeIf { code -> code.isNotBlank() }) } }.distinct().size} objetos"
         }
         val panel=LinearLayout(this).apply {
             orientation=LinearLayout.VERTICAL
             setPadding(dp(18),dp(4),dp(18),0)
             addView(TextView(this@RouteManagerActivity).apply {
-                text="${imported.size} objetos identificados\nEndereços extraídos:\n$addressSummary\n\nExemplos de códigos:\n$examples\n\nSelecione o roteiro permanente para organizar as entregas."
+                text="${objectCodes.size} objetos identificados em ${grouped.size} endereços\nEndereços extraídos:\n$addressSummary\n\nExemplos de códigos:\n$examples\n\nSelecione o roteiro permanente para organizar as entregas."
                 textSize=13f;setTextColor(ink)
             })
             addView(picker,LinearLayout.LayoutParams(-1,-2).apply{topMargin=dp(10)})
@@ -363,7 +364,7 @@ class RouteManagerActivity:Activity() {
                     store.saveDailyDeliveries(route.id,matched)
                     store.setActive(route.id)
                     refresh()
-                    Toast.makeText(this,"${matched.size} entregas organizadas no roteiro. $unmatched sem correspondência.",Toast.LENGTH_LONG).show()
+                    val matchedObjects=matched.sumOf { it.objectCodes.ifEmpty { listOfNotNull(it.objectCode.takeIf { code -> code.isNotBlank() }) }.distinct().size }\n                    Toast.makeText(this,"${matched.size} paradas (${matchedObjects} objetos) organizadas. $unmatched endereços sem correspondência.",Toast.LENGTH_LONG).show()
                 }.onFailure { Toast.makeText(this,it.message?: "Não foi possível montar a sequência diária.",Toast.LENGTH_LONG).show() }
             }.show().also{styleDialog(it)}
     }
@@ -569,25 +570,46 @@ class RouteManagerActivity:Activity() {
     }
 
     private fun parseRecognizedObjects(raw:String):List<RouteAddress> {
-        val lines=raw.lines().map { it.trim() }.filter { it.isNotBlank() }
-        val codeRegex=Regex("(?i)\\b[A-Z]{2}\\d{9}[A-Z]{2}\\b")
-        val hits=mutableListOf<Pair<Int,String>>()
-        lines.forEachIndexed { index,line -> codeRegex.findAll(line).forEach { hits.add(index to it.value.uppercase()) } }
+        val lines=raw.lines().map { it.trim() }
+        val codeRegex=Regex("(?i)\\b([A-Z]{2})\\s*(\\d{3})\\s*(\\d{3})\\s*(\\d{3})\\s*([A-Z]{2})\\b")
+        val cepRegex=Regex("\\b\\d{5}-?\\d{3}\\b")
         val result=mutableListOf<RouteAddress>()
-        hits.forEachIndexed { hitIndex,hit ->
-            val nextLine=hits.getOrNull(hitIndex+1)?.first ?: lines.size
-            val chunk=lines.subList(hit.first,nextLine).joinToString(" ")
-            val code=hit.second
-            val cleaned=chunk.replace(codeRegex," ").replace(Regex("(?i)\\b(CEP|OBJETO|ORDEM|ENDEREÇO)\\b")," ")
-            val cep=Regex("\\b\\d{5}-?\\d{3}\\b").find(cleaned)?.value.orEmpty()
-            val withoutCep=cleaned.replace(Regex("\\b\\d{5}-?\\d{3}\\b")," ")
-            val normalized=withoutCep.replace(Regex("[|;•]+")," ").replace(Regex("\\s+")," ").trim(' ', '-', ',', ':')
-            val numberMatch=Regex("(?:,|\\s)(\\d+[A-Za-z]?)$").find(normalized)
-            val house=numberMatch?.groupValues?.get(1) ?: "0"
-            val street=if(numberMatch!=null)normalized.removeRange(numberMatch.range).trim(' ', '-', ',', ':') else normalized
-            result.add(RouteAddress(street=street.ifBlank { "Endereço a conferir" },number=house,segment=1,direction="LISTA IMPORTADA",cep=cep,objectCode=code))
+        var blockStart=0
+        lines.forEachIndexed { index,line ->
+            val cepMatch=cepRegex.find(line) ?: return@forEachIndexed
+            val block=lines.subList(blockStart,index+1)
+            val codes=block.flatMap { row -> codeRegex.findAll(row).map { hit ->
+                (hit.groupValues[1]+hit.groupValues[2]+hit.groupValues[3]+hit.groupValues[4]+hit.groupValues[5]).uppercase()
+            }.toList() }.distinct()
+            if(codes.isNotEmpty()) {
+                val addressLabelIndex=block.indexOfFirst { it.contains("Endereço",true) || it.contains("Endereco",true) }
+                val addressParts=mutableListOf<String>()
+                if(addressLabelIndex>=0) {
+                    val labelLine=block[addressLabelIndex]
+                    val inline=labelLine.substringAfter(':',"").trim()
+                    if(inline.isNotBlank()) addressParts.add(inline)
+                    for(i in addressLabelIndex+1 until block.size) {
+                        val candidate=block[i]
+                        if(candidate.contains("CEP",true) || candidate.contains("Doc.",true) || candidate.contains("Hora",true) || candidate.contains("Destinat",true) || candidate.contains("Nome legível",true)) break
+                        if(codeRegex.containsMatchIn(candidate)) continue
+                        val cleaned=candidate.replace(cepRegex," ").replace(Regex("(?i)\\b(CEP|ENDEREÇO|ENDERECO)\\b")," ").trim(' ',':','-')
+                        if(cleaned.isNotBlank() && !cleaned.matches(Regex("\\d+[-/]\\d+"))) addressParts.add(cleaned)
+                    }
+                }
+                val rawAddress=addressParts.joinToString(" ").replace(Regex("\\s+")," ").trim(' ',':','-')
+                val normalizedAddress=rawAddress.replace(Regex("(?i)^Endereço\\s*:?\\s*"),"").replace(Regex("(?i)^Endereco\\s*:?\\s*"),"")
+                val numberMatch=Regex("^(.*?)[,\\s]+(\\d+[A-Za-z]?)$").find(normalizedAddress)
+                val street=numberMatch?.groupValues?.get(1)?.trim().orEmpty()
+                val house=numberMatch?.groupValues?.get(2).orEmpty()
+                val cep=cepMatch.value.filter { it.isDigit() }
+                result.add(RouteAddress(
+                    street=street,number=house,segment=1,direction="LISTA IMPORTADA",
+                    cep=cep,objectCode=codes.first(),objectCodes=codes
+                ))
+            }
+            blockStart=index+1
         }
-        return result.distinctBy { it.objectCode }
+        return result
     }
 
     private fun exportRoute(route:RouteDefinition) {
