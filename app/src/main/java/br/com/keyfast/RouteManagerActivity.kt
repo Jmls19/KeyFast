@@ -523,7 +523,7 @@ class RouteManagerActivity:Activity() {
                         val bytes=contentResolver.openInputStream(uri)!!.use{it.readBytes()}
                         val raw=if(bytes.size>=2&&bytes[0]==0x50.toByte()&&bytes[1]==0x4b.toByte())parseXlsx(bytes) else String(bytes,Charsets.UTF_8)
                         if(raw.trimStart().startsWith("{"))store.importJson(raw)
-                        else if(Regex("(?i)[A-Z]{2}\d{9}[A-Z]{2}").containsMatchIn(raw)) importDeliveryText(raw,filename)
+                        else if(Regex("(?i)[A-Z]{2}\\d{9}[A-Z]{2}").containsMatchIn(raw)) importDeliveryText(raw,filename)
                         else {
                             val addresses=parseCsv(raw)
                             require(addresses.isNotEmpty()){"Nenhum trecho ou objeto foi reconhecido no arquivo."}
