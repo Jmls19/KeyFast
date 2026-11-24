@@ -501,7 +501,7 @@ class RouteManagerActivity:Activity() {
             .replace(Regex("</w:p>"),"\n")
             .replace(Regex("<[^>]+>")," ")
             .replace("&amp;","&").replace("&lt;","<").replace("&gt;",">")
-            .replace(Regex("\\s+")," ").trim()
+            .replace(Regex("[ \\t]+")," ").replace(Regex("\\n{2,}"),"\\n").trim()
     }
 
     private fun normalizeDocumentText(raw:String,extension:String):String = when(extension) {
